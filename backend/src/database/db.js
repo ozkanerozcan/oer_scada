@@ -24,6 +24,23 @@ try {
     db.exec("ALTER TABLE devices ADD COLUMN type TEXT NOT NULL DEFAULT 'Modbus TCP';");
     console.log('[DB] Devices table migrated to include type.');
   }
+  // OPC UA fields
+  if (cols.length > 0 && !cols.some(c => c.name === 'opcuaEndpoint')) {
+    db.exec("ALTER TABLE devices ADD COLUMN opcuaEndpoint TEXT DEFAULT '';");
+    db.exec("ALTER TABLE devices ADD COLUMN opcuaSecurityMode TEXT DEFAULT 'None';");
+    db.exec("ALTER TABLE devices ADD COLUMN opcuaUsername TEXT DEFAULT '';");
+    db.exec("ALTER TABLE devices ADD COLUMN opcuaPassword TEXT DEFAULT '';");
+    console.log('[DB] Devices table migrated to include OPC UA fields.');
+  }
+} catch(e) { /* table doesn't exist yet, no action needed */ }
+
+// ─── Migration guard: watch_items dataType column ───────────────────────────
+try {
+  const wCols = db.prepare("PRAGMA table_info(watch_items)").all();
+  if (wCols.length > 0 && !wCols.some(c => c.name === 'dataType')) {
+    db.exec("ALTER TABLE watch_items ADD COLUMN dataType TEXT DEFAULT '';");
+    console.log('[DB] watch_items table migrated to include dataType.');
+  }
 } catch(e) { /* table doesn't exist yet, no action needed */ }
 
 const init = () => {
@@ -38,11 +55,15 @@ const init = () => {
     CREATE TABLE IF NOT EXISTS devices (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
-      ip TEXT NOT NULL,
+      ip TEXT NOT NULL DEFAULT '',
       port INTEGER NOT NULL DEFAULT 502,
       slaveId INTEGER NOT NULL DEFAULT 1,
       type TEXT NOT NULL DEFAULT 'Modbus TCP',
-      enabled INTEGER NOT NULL DEFAULT 1
+      enabled INTEGER NOT NULL DEFAULT 1,
+      opcuaEndpoint TEXT DEFAULT '',
+      opcuaSecurityMode TEXT DEFAULT 'None',
+      opcuaUsername TEXT DEFAULT '',
+      opcuaPassword TEXT DEFAULT ''
     );
 
     -- Poll Groups: reusable variable templates, not tied to a device
@@ -84,6 +105,13 @@ const init = () => {
       widgets TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS watch_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tagKey TEXT UNIQUE NOT NULL,
+      sortOrder INTEGER NOT NULL DEFAULT 0,
+      dataType TEXT DEFAULT ''
     );
   `);
 

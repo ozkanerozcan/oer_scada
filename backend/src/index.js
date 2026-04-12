@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const db = require('./database/db');
 const ModbusService = require('./services/modbusService');
+const OpcUaService = require('./services/opcuaService');
 
 process.on('uncaughtException', (err) => {
   console.error('[Uncaught Exception]', err.message || err);
@@ -36,34 +37,46 @@ fastify.post('/api/auth/login', async (request, reply) => {
 fastify.get('/api/devices', async () => db.prepare('SELECT d.*, dga.groupId as variableGroupId FROM devices d LEFT JOIN device_group_assignments dga ON d.id = dga.deviceId').all());
 
 fastify.post('/api/devices', async (request) => {
-  const { name, ip, port = 502, slaveId = 1, type = 'Modbus TCP', enabled = 1 } = request.body;
+  const { name, ip = '', port = 502, slaveId = 1, type = 'Modbus TCP', enabled = 1 } = request.body;
   const variableGroupId = request.body.variableGroupId ? Number(request.body.variableGroupId) : null;
-  const info = db.prepare('INSERT INTO devices (name, ip, port, slaveId, type, enabled) VALUES (?, ?, ?, ?, ?, ?)').run(name, ip, port, slaveId, type, enabled);
+  const opcuaEndpoint = request.body.opcuaEndpoint || '';
+  const opcuaSecurityMode = request.body.opcuaSecurityMode || 'None';
+  const opcuaUsername = request.body.opcuaUsername || '';
+  const opcuaPassword = request.body.opcuaPassword || '';
+  const info = db.prepare('INSERT INTO devices (name, ip, port, slaveId, type, enabled, opcuaEndpoint, opcuaSecurityMode, opcuaUsername, opcuaPassword) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(name, ip, port, slaveId, type, enabled, opcuaEndpoint, opcuaSecurityMode, opcuaUsername, opcuaPassword);
   const deviceId = info.lastInsertRowid;
-  if (variableGroupId) {
+  if (variableGroupId && type === 'Modbus TCP') {
     db.prepare('INSERT INTO device_group_assignments (deviceId, groupId) VALUES (?, ?)').run(Number(deviceId), Number(variableGroupId));
   }
-  ModbusService.restartPolling(fastify, deviceId);
+  if (type === 'Modbus TCP') ModbusService.restartPolling(fastify, deviceId);
+  else if (type === 'OPC UA') OpcUaService.restartPolling(fastify, deviceId);
   return { success: true, id: deviceId };
 });
 
 fastify.put('/api/devices/:id', async (request) => {
   const id = Number(request.params.id);
-  const { name, ip, port, slaveId, type, enabled } = request.body;
+  const { name, ip = '', port, slaveId, type, enabled } = request.body;
   const variableGroupId = request.body.variableGroupId ? Number(request.body.variableGroupId) : null;
-  db.prepare('UPDATE devices SET name=?, ip=?, port=?, slaveId=?, type=?, enabled=? WHERE id=?').run(name, ip, port, slaveId, type, enabled, id);
+  const opcuaEndpoint = request.body.opcuaEndpoint || '';
+  const opcuaSecurityMode = request.body.opcuaSecurityMode || 'None';
+  const opcuaUsername = request.body.opcuaUsername || '';
+  const opcuaPassword = request.body.opcuaPassword || '';
+  db.prepare('UPDATE devices SET name=?, ip=?, port=?, slaveId=?, type=?, enabled=?, opcuaEndpoint=?, opcuaSecurityMode=?, opcuaUsername=?, opcuaPassword=? WHERE id=?').run(name, ip, port, slaveId, type, enabled, opcuaEndpoint, opcuaSecurityMode, opcuaUsername, opcuaPassword, id);
   db.prepare('DELETE FROM device_group_assignments WHERE deviceId=?').run(id);
-  if (variableGroupId) {
+  if (variableGroupId && type === 'Modbus TCP') {
     db.prepare('INSERT INTO device_group_assignments (deviceId, groupId) VALUES (?, ?)').run(id, variableGroupId);
   }
-  ModbusService.restartPolling(fastify, id);
+  if (type === 'Modbus TCP') ModbusService.restartPolling(fastify, id);
+  else if (type === 'OPC UA') OpcUaService.restartPolling(fastify, id);
   return { success: true };
 });
 
 fastify.delete('/api/devices/:id', async (request) => {
   const { id } = request.params;
+  const device = db.prepare('SELECT type FROM devices WHERE id=?').get(id);
   db.prepare('DELETE FROM devices WHERE id=?').run(id);
-  ModbusService.restartPolling(fastify);
+  if (device?.type === 'OPC UA') OpcUaService.restartPolling(fastify);
+  else ModbusService.restartPolling(fastify);
   return { success: true };
 });
 
@@ -329,10 +342,14 @@ fastify.delete('/api/dashboards/:id', async (request) => {
 fastify.get('/api/watch', async () => db.prepare('SELECT * FROM watch_items ORDER BY sortOrder, id').all());
 
 fastify.post('/api/watch', async (request) => {
-  const { tagKey } = request.body;
+  const { tagKey, dataType = '' } = request.body;
   const max = db.prepare('SELECT MAX(sortOrder) as m FROM watch_items').get();
-  const info = db.prepare('INSERT OR IGNORE INTO watch_items (tagKey, sortOrder) VALUES (?, ?)').run(tagKey, (max?.m || 0) + 1);
-  return { success: true, id: info.lastInsertRowid };
+  const info = db.prepare('INSERT OR IGNORE INTO watch_items (tagKey, sortOrder, dataType) VALUES (?, ?, ?)').run(tagKey, (max?.m || 0) + 1, dataType);
+  // If tagKey already existed, update dataType if provided
+  if (info.changes === 0 && dataType) {
+    db.prepare('UPDATE watch_items SET dataType=? WHERE tagKey=?').run(dataType, tagKey);
+  }
+  return { success: true, id: info.lastInsertRowid || db.prepare('SELECT id FROM watch_items WHERE tagKey=?').get(tagKey)?.id };
 });
 
 fastify.delete('/api/watch/:id', async (request) => {

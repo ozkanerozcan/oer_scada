@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types'
+import { useState, useEffect } from 'react'
 import useDashboardStore from '@/pages/DashboardBuilder/useDashboardStore'
-import { Trash2, X } from 'lucide-react'
+import { Trash2, X, Link, LinkIcon, Unlink } from 'lucide-react'
 
 // ── Reusable form controls ──────────────────────────────────────
 function Row({ label, children }) {
@@ -135,8 +136,87 @@ function NumberInput({ value, onChange, min, max }) {
 
 // ── Widget-specific config panels ───────────────────────────────
 function ValueCardConfig({ config, update }) {
+  const [watchItems, setWatchItems] = useState([])
+  const [loadingWatch, setLoadingWatch] = useState(false)
+
+  const API = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+
+  useEffect(() => {
+    setLoadingWatch(true)
+    fetch(`${API}/watch`)
+      .then(r => r.json())
+      .then(data => {
+        const items = Array.isArray(data) ? data : (data?.data || [])
+        setWatchItems(items)
+      })
+      .catch(() => {})
+      .finally(() => setLoadingWatch(false))
+  }, [])
+
+  const boundTag = config.tagKey || ''
+
   return (
     <>
+      {/* ── Tag Binding Section ── */}
+      <div style={{
+        background: boundTag
+          ? 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.08))'
+          : 'var(--bg-tertiary)',
+        border: `1px solid ${boundTag ? 'rgba(59,130,246,0.3)' : 'var(--border)'}`,
+        borderRadius: 10, padding: '12px 14px', marginBottom: 18,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: boundTag ? 'var(--accent)' : 'var(--text-muted)' }}>
+            {boundTag ? '🔗 Tag Bound' : '⬡ Tag Binding'}
+          </div>
+          {boundTag && (
+            <button
+              onClick={() => update({ tagKey: '' })}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex' }}
+              title="Unbind tag"
+            >
+              <Unlink size={13} />
+            </button>
+          )}
+        </div>
+        {boundTag ? (
+          <div style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--accent)', wordBreak: 'break-all', lineHeight: 1.5 }}>
+            {boundTag}
+          </div>
+        ) : (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+            Bind to a watch list variable to display <strong>live data</strong>.
+          </div>
+        )}
+        <select
+          value={boundTag}
+          onChange={e => update({ tagKey: e.target.value })}
+          style={{
+            marginTop: boundTag ? 8 : 0,
+            width: '100%',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            color: 'var(--text-primary)',
+            fontSize: 11,
+            padding: '6px 8px',
+            fontFamily: 'inherit',
+            outline: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="">{loadingWatch ? 'Loading...' : '— None (static value) —'}</option>
+          {watchItems.map(w => (
+            <option key={w.id} value={w.tagKey}>
+              {w.tagKey}{w.dataType ? ` [${w.dataType}]` : ''}
+            </option>
+          ))}
+          {watchItems.length === 0 && !loadingWatch && (
+            <option disabled>No variables in watch list</option>
+          )}
+        </select>
+      </div>
+
       <Row label="Show Title">
         <Toggle value={config.showTitle} onChange={v => update({ showTitle: v })} label={config.showTitle ? 'Visible' : 'Hidden'} />
       </Row>
@@ -145,8 +225,8 @@ function ValueCardConfig({ config, update }) {
           <TextInput value={config.title} onChange={v => update({ title: v })} placeholder="Card title" />
         </Row>
       )}
-      <Row label="Value">
-        <TextInput value={config.value} onChange={v => update({ value: v })} placeholder="e.g. 2369" />
+      <Row label="Static Value">
+        <TextInput value={config.value} onChange={v => update({ value: v })} placeholder={boundTag ? 'Overridden by binding' : 'e.g. 2369'} />
       </Row>
       <Row label="Show Unit">
         <Toggle value={config.showUnit} onChange={v => update({ showUnit: v })} label={config.showUnit ? 'Visible' : 'Hidden'} />
@@ -172,8 +252,91 @@ function ValueCardConfig({ config, update }) {
 }
 
 function LEDConfig({ config, update }) {
+  const [watchItems, setWatchItems] = useState([])
+  const [loadingWatch, setLoadingWatch] = useState(false)
+
+  const API = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+
+  useEffect(() => {
+    setLoadingWatch(true)
+    fetch(`${API}/watch`)
+      .then(r => r.json())
+      .then(data => {
+        const items = Array.isArray(data) ? data : (data?.data || [])
+        // Filter to boolean data types only
+        const boolItems = items.filter(w => {
+          const dt = (w.dataType || '').toLowerCase()
+          return dt === 'bool' || dt === 'boolean'
+        })
+        setWatchItems(boolItems)
+      })
+      .catch(() => {})
+      .finally(() => setLoadingWatch(false))
+  }, [])
+
+  const boundTag = config.tagKey || ''
+
   return (
     <>
+      {/* ── Tag Binding Section ── */}
+      <div style={{
+        background: boundTag
+          ? 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.08))'
+          : 'var(--bg-tertiary)',
+        border: `1px solid ${boundTag ? 'rgba(59,130,246,0.3)' : 'var(--border)'}`,
+        borderRadius: 10, padding: '12px 14px', marginBottom: 18,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: boundTag ? 'var(--accent)' : 'var(--text-muted)' }}>
+            {boundTag ? '🔗 Tag Bound' : '⬡ Tag Binding'}
+          </div>
+          {boundTag && (
+            <button
+              onClick={() => update({ tagKey: '' })}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex' }}
+              title="Unbind tag"
+            >
+              <Unlink size={13} />
+            </button>
+          )}
+        </div>
+        {boundTag ? (
+          <div style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--accent)', wordBreak: 'break-all', lineHeight: 1.5 }}>
+            {boundTag}
+          </div>
+        ) : (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+            Select a <strong>Boolean</strong> watch item to drive this LED from live data.
+          </div>
+        )}
+
+        <select
+          value={boundTag}
+          onChange={e => update({ tagKey: e.target.value })}
+          style={{
+            marginTop: boundTag ? 8 : 0,
+            width: '100%',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            color: 'var(--text-primary)',
+            fontSize: 11,
+            padding: '6px 8px',
+            fontFamily: 'inherit',
+            outline: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="">{loadingWatch ? 'Loading...' : '— None (manual) —'}</option>
+          {watchItems.map(w => (
+            <option key={w.id} value={w.tagKey}>{w.tagKey}</option>
+          ))}
+          {watchItems.length === 0 && !loadingWatch && (
+            <option disabled>No boolean tags in watch list</option>
+          )}
+        </select>
+      </div>
+
       <Row label="Show Label">
         <Toggle value={config.showLabel} onChange={v => update({ showLabel: v })} label={config.showLabel ? 'Visible' : 'Hidden'} />
       </Row>

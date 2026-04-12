@@ -11,6 +11,7 @@ const DEFAULT_CONFIGS = {
     fontSize: 'large',
     accentColor: '#3b82f6',
     bgColor: '',
+    tagKey: '',
   },
   LEDIndicator: {
     label: 'Status',
@@ -22,6 +23,7 @@ const DEFAULT_CONFIGS = {
     ledSize: 'medium',
     blink: true,
     showLabel: true,
+    tagKey: '',
   },
   DonutChart: {
     title: 'Donut Chart',

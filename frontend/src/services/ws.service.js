@@ -11,6 +11,28 @@ let retryTimer = null
 const RETRY_DELAYS = [2000, 5000, 10000, 30000]
 let retryCount = 0
 
+// ─── Device heartbeat tracking ────────────────────────────────────────────────
+// Track the last time we received a DATA_UPDATE for each device.
+// If a device goes silent for DISCONNECT_TIMEOUT ms it is marked disconnected.
+const lastDataReceived = new Map() // deviceId -> timestamp
+const DISCONNECT_TIMEOUT = 6000   // 6 s — at least 3 missed poll cycles at 2 s interval
+
+let heartbeatTimer = null
+
+function startHeartbeat() {
+  if (heartbeatTimer) return
+  heartbeatTimer = setInterval(() => {
+    const now = Date.now()
+    const store = useDeviceStore.getState()
+    for (const [deviceId, ts] of lastDataReceived) {
+      const current = store.statuses[deviceId]
+      if (current === 'connected' && now - ts > DISCONNECT_TIMEOUT) {
+        store.setDeviceStatus(deviceId, 'disconnected')
+      }
+    }
+  }, 2000)
+}
+
 export function connectWS(url) {
   if (MOCK_MODE) {
     console.info('[WS] Mock mode enabled. Starting local data simulation...')
@@ -25,22 +47,52 @@ export function connectWS(url) {
       retryCount = 0
       clearTimeout(retryTimer)
       console.info('[WS] Connected')
+      startHeartbeat()
     }
 
     ws.onmessage = (event) => {
       try {
-        const { type, payload } = JSON.parse(event.data)
+        // Capture top-level deviceId alongside type/payload
+        const msg = JSON.parse(event.data)
+        const { type, payload } = msg
+
         switch (type) {
-          case 'DATA_UPDATE':
-            // Merge { 'Device.Group.Tag': val } into store
+          case 'DATA_UPDATE': {
+            // Merge tag values into store
             useTagStore.getState().setTagValues(payload)
+
+            // Infer device status from live data flow:
+            // deviceId may sit at top-level (old + new backend) or inside payload
+            const deviceId = msg.deviceId
+            if (deviceId !== undefined && deviceId !== null) {
+              lastDataReceived.set(deviceId, Date.now())
+              const current = useDeviceStore.getState().statuses[deviceId]
+              if (current !== 'connected') {
+                useDeviceStore.getState().setDeviceStatus(deviceId, 'connected')
+              }
+            }
             break
-          case 'device:status':
-            useDeviceStore.getState().setDeviceStatus(payload.deviceId, payload.status)
+          }
+
+          case 'device:status': {
+            // Support both formats:
+            //   new: { type, payload: { deviceId, status } }
+            //   old: { type, deviceId, status }
+            const deviceId = payload?.deviceId ?? msg.deviceId
+            const status   = payload?.status   ?? msg.status
+            if (deviceId !== undefined) {
+              useDeviceStore.getState().setDeviceStatus(deviceId, status)
+              if (status === 'connected') {
+                lastDataReceived.set(deviceId, Date.now())
+              }
+            }
             break
+          }
+
           case 'alarm:trigger':
             useAlarmStore.getState().addAlarm(payload)
             break
+
           case 'alarm:clear':
             useAlarmStore.getState().clearAlarm(payload.alarmId, payload.clearedAt)
             break

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import useUiStore from '@/stores/uiStore'
 import useAuthStore from '@/stores/authStore'
 import useDashboardPagesStore from '@/stores/dashboardPagesStore'
-import { LayoutDashboard, Users, Settings, X, Moon, Sun, Globe, LogOut, LogIn, User, Building2, Menu, HardDrive, Tags, Activity, ChevronDown, ChevronRight, Maximize, LayoutTemplate, SlidersHorizontal } from 'lucide-react'
+import { LayoutDashboard, Users, Settings, X, Moon, Sun, Globe, LogOut, LogIn, User, Building2, Menu, HardDrive, Tags, Activity, ChevronDown, ChevronRight, Maximize, LayoutTemplate, SlidersHorizontal, Radio } from 'lucide-react'
 
 // Static nav items (non-dashboard)
 const STATIC_NAV = [
@@ -13,7 +13,8 @@ const STATIC_NAV = [
     label: 'Tags',
     icon: Tags,
     subItems: [
-      { path: '/tags-management', label: 'Management', icon: Settings },
+      { path: '/tags-management', label: 'Modbus TCP', icon: Settings },
+      { path: '/tags-opcua', label: 'OPC UA Browser', icon: Radio },
       { path: '/tags', label: 'Watch Table', icon: Activity },
     ]
   },

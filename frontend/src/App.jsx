@@ -6,6 +6,7 @@ import Press500TDashboard from '@/pages/Press500TDashboard'
 import Press500TPres1 from '@/pages/Press500TPres1'
 import TagBrowser from '@/pages/TagBrowser'
 import TagManagement from '@/pages/TagManagement'
+import OpcUaBrowser from '@/pages/OpcUaBrowser'
 import Alarms from '@/pages/Alarms'
 import Users from '@/pages/Users'
 import Devices from '@/pages/Devices'
@@ -22,6 +23,7 @@ const router = createBrowserRouter([
       { path: '/press-500t', element: <div className="p-8 text-center">Redirecting to Pres 1...</div> },
       { path: '/tags', element: <TagBrowser /> },
       { path: '/tags-management', element: <TagManagement /> },
+      { path: '/tags-opcua', element: <OpcUaBrowser /> },
       { path: '/alarms', element: <Alarms /> },
       { path: '/users', element: <Users /> },
       { path: '/devices', element: <Devices /> },

@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types'
 import { useRef, useState, useEffect } from 'react'
+import useTagStore from '@/stores/tagStore'
 
 const SIZE_RATIO = { small: 0.35, medium: 0.55, large: 0.75, xl: 0.9 }
 
@@ -14,9 +15,16 @@ export default function LEDIndicator({ config = {}, isPreview = false }) {
     ledSize   = 'medium',
     blink     = true,
     showLabel = true,
+    tagKey    = '',
   } = config
 
-  const color        = state ? onColor : offColor
+  // Live tag binding: if tagKey is set, drive state from the tag store
+  const liveValue = useTagStore(s => tagKey ? s.values[tagKey] : null)
+  const resolvedState = tagKey && liveValue !== null && liveValue !== undefined
+    ? Boolean(liveValue.value)
+    : Boolean(state)
+
+  const color = resolvedState ? onColor : offColor
   const containerRef = useRef(null)
   const [dims, setDims] = useState({ w: 240, h: 60 })
 
@@ -36,14 +44,14 @@ export default function LEDIndicator({ config = {}, isPreview = false }) {
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '4px 8px', overflow: 'hidden' }}>
         <div style={{ position: 'relative', width: s, height: s, flexShrink: 0 }}>
-          <div style={{ position: 'absolute', inset: -3, borderRadius: '50%', background: color, opacity: state ? 0.2 : 0.05, filter: 'blur(3px)' }} />
-          <div style={{ width: s, height: s, borderRadius: '50%', position: 'relative', background: state ? `radial-gradient(circle at 35% 35%, ${color}ff, ${color}88)` : `radial-gradient(circle at 35% 35%, ${color}55, ${color}22)`, boxShadow: state ? `0 0 6px ${color}` : 'inset 0 2px 4px rgba(0,0,0,0.4)', border: `1.5px solid ${color}44` }}>
+          <div style={{ position: 'absolute', inset: -3, borderRadius: '50%', background: color, opacity: resolvedState ? 0.2 : 0.05, filter: 'blur(3px)' }} />
+          <div style={{ width: s, height: s, borderRadius: '50%', position: 'relative', background: resolvedState ? `radial-gradient(circle at 35% 35%, ${color}ff, ${color}88)` : `radial-gradient(circle at 35% 35%, ${color}55, ${color}22)`, boxShadow: resolvedState ? `0 0 6px ${color}` : 'inset 0 2px 4px rgba(0,0,0,0.4)', border: `1.5px solid ${color}44` }}>
             <div style={{ position: 'absolute', top: '18%', left: '22%', width: '30%', height: '25%', borderRadius: '50%', background: 'rgba(255,255,255,0.5)', filter: 'blur(1px)' }} />
           </div>
         </div>
-        {showLabel && <span style={{ fontSize: 8, fontWeight: 700, color: state ? color : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>{label}</span>}
-        <span style={{ fontSize: 7, fontWeight: 700, color: state ? color : 'var(--text-muted)', background: state ? `${color}15` : 'var(--bg-tertiary)', border: `1px solid ${state ? color + '44' : 'var(--border)'}`, padding: '1px 4px', borderRadius: 100, flexShrink: 0 }}>
-          {state ? onText : offText}
+        {showLabel && <span style={{ fontSize: 8, fontWeight: 700, color: resolvedState ? color : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>{label}</span>}
+        <span style={{ fontSize: 7, fontWeight: 700, color: resolvedState ? color : 'var(--text-muted)', background: resolvedState ? `${color}15` : 'var(--bg-tertiary)', border: `1px solid ${resolvedState ? color + '44' : 'var(--border)'}`, padding: '1px 4px', borderRadius: 100, flexShrink: 0 }}>
+          {resolvedState ? onText : offText}
         </span>
       </div>
     )
@@ -76,22 +84,22 @@ export default function LEDIndicator({ config = {}, isPreview = false }) {
         <div style={{
           position: 'absolute', inset: -Math.round(ledD * 0.25),
           borderRadius: '50%', background: color,
-          opacity: state ? 0.18 : 0.05,
+          opacity: resolvedState ? 0.18 : 0.05,
           filter: `blur(${Math.round(ledD * 0.3)}px)`,
           transition: 'opacity 0.4s, background 0.4s',
         }} />
         {/* Body */}
         <div style={{
           width: ledD, height: ledD, borderRadius: '50%', position: 'relative',
-          background: state
+          background: resolvedState
             ? `radial-gradient(circle at 35% 35%, ${color}ff, ${color}88)`
             : `radial-gradient(circle at 35% 35%, ${color}55, ${color}22)`,
-          boxShadow: state
+          boxShadow: resolvedState
             ? `0 0 ${Math.round(ledD * 0.5)}px ${color}, 0 0 ${ledD}px ${color}44`
             : 'inset 0 2px 4px rgba(0,0,0,0.4)',
           border: `2px solid ${color}44`,
           transition: 'background 0.4s, box-shadow 0.4s',
-          animation: state && blink ? 'ledPulse 1.8s ease-in-out infinite' : 'none',
+          animation: resolvedState && blink ? 'ledPulse 1.8s ease-in-out infinite' : 'none',
         }}>
           {/* Specular highlight */}
           <div style={{ position: 'absolute', top: '18%', left: '22%', width: '30%', height: '25%', borderRadius: '50%', background: 'rgba(255,255,255,0.5)', filter: 'blur(1px)' }} />
@@ -102,7 +110,7 @@ export default function LEDIndicator({ config = {}, isPreview = false }) {
       {showLabel && (
         <span style={{
           fontSize, fontWeight: 700,
-          color: state ? color : 'var(--text-muted)',
+          color: resolvedState ? color : 'var(--text-muted)',
           textTransform: 'uppercase', letterSpacing: '0.08em',
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           transition: 'color 0.4s',
@@ -114,14 +122,14 @@ export default function LEDIndicator({ config = {}, isPreview = false }) {
       {/* ON/OFF badge */}
       <span style={{
         fontSize: badgeFont, fontWeight: 700,
-        color: state ? color : 'var(--text-muted)',
-        background: state ? `${color}15` : 'var(--bg-tertiary)',
-        border: `1px solid ${state ? color + '44' : 'var(--border)'}`,
+        color: resolvedState ? color : 'var(--text-muted)',
+        background: resolvedState ? `${color}15` : 'var(--bg-tertiary)',
+        border: `1px solid ${resolvedState ? color + '44' : 'var(--border)'}`,
         padding: `${Math.max(2, Math.round(badgeFont * 0.15))}px ${Math.max(6, Math.round(badgeFont * 0.55))}px`,
         borderRadius: 100, flexShrink: 0,
         transition: 'all 0.4s', letterSpacing: '0.06em',
       }}>
-        {state ? onText : offText}
+        {resolvedState ? onText : offText}
       </span>
     </div>
   )

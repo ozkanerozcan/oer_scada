@@ -145,3 +145,21 @@ export const deleteDashboard = async (id) => {
   if (!response.ok) throw new Error('Failed to delete dashboard');
   return response.json();
 };
+
+export const browseOpcUaNode = async (payload) => {
+  const response = await fetch(`${API_BASE_URL}/opcua/browse`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return response.json();
+};
+
+export const testOpcUaConnection = async (payload) => {
+  const response = await fetch(`${API_BASE_URL}/opcua/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return response.json();
+};

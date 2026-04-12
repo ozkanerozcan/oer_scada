@@ -289,7 +289,7 @@ const TagManagement = memo(() => {
         }
       } else {
         for (const tagKey of tagKeys) {
-          await fetch(`${API}/watch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tagKey }) })
+          await fetch(`${API}/watch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tagKey, dataType: tag.dataType }) })
         }
       }
       await fetchWatchItems()
@@ -314,7 +314,7 @@ const TagManagement = memo(() => {
             <Layers size={28} strokeWidth={2.5} />
           </div>
           <div>
-            <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Tag Management</h1>
+            <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Modbus TCP</h1>
             <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0, marginTop: '4px' }}>Configure variable groups and parameters</p>
           </div>
         </div>

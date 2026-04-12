@@ -31,10 +31,15 @@ function parseBufferValue(buffer, dataType, bitOffset = 0) {
   }
 }
 
+// ─── Is an error a TCP/socket-level connection failure? ───────────────────────
+// These errors mean the underlying socket is dead, not just a bad register.
+function isConnectionError(err) {
+  return /ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTCONN|EPIPE|socket hang up|closed|not open/i
+    .test(err.message || '');
+}
+
 // ─── Build polling blocks for a device ────────────────────────────────────────
-// Returns array of blocks ready for readHoldingRegisters
 function buildPollingBlocks(db, deviceId) {
-  // Get all groups assigned to this device, with their ordered tags
   const groups = db.prepare(`
     SELECT g.* FROM tag_groups g
     JOIN device_group_assignments dga ON g.id = dga.groupId
@@ -47,7 +52,6 @@ function buildPollingBlocks(db, deviceId) {
     const tags = db.prepare('SELECT * FROM tags WHERE groupId=? ORDER BY sortOrder').all(group.id);
     if (tags.length === 0) continue;
 
-    // Accumulate register offsets sequentially with bit-packing
     let offset = 0;
     let boolSlotOffset = null;
     let boolSlotUsed = 0;
@@ -72,10 +76,10 @@ function buildPollingBlocks(db, deviceId) {
       }
     });
 
-    const totalRegisters = offset; // Final cursor position
+    const totalRegisters = offset;
     if (totalRegisters === 0) continue;
     if (totalRegisters > 125) {
-      console.warn(`[Modbus] Group "${group.name}" (id=${group.id}) exceeds 125 registers (${totalRegisters}). Clamped.`);
+      console.warn(`[Modbus] Group "${group.name}" exceeds 125 registers (${totalRegisters}). Clamped.`);
     }
 
     blocks.push({
@@ -84,7 +88,7 @@ function buildPollingBlocks(db, deviceId) {
       startAddress: group.startAddress,
       totalRegisters: Math.min(totalRegisters, 125),
       readInterval: group.readInterval || 1000,
-      lastPoll: 0
+      lastPoll: 0,
     });
   }
   return blocks;
@@ -108,88 +112,122 @@ async function startDevicePolling(fastify, specificId = null) {
         continue;
       }
 
-      const client = new ModbusRTU();
-      
-      // Prevent unhandled socket errors (e.g. ECONNRESET) from crashing Node
-      client.on('error', (err) => {
-        console.error(`[Modbus] Socket error on "${device.name}":`, err.message);
-      });
-
-      // Connection timeout wrapper
-      const connectWithTimeout = (ip, options) => {
-        return new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Connection timeout'));
-          }, 5000);
-          client.connectTCP(ip, options)
-            .then(() => {
-              clearTimeout(timeout);
-              resolve();
-            })
-            .catch((err) => {
-              clearTimeout(timeout);
-              reject(err);
-            });
+      // ── WebSocket status helper ─────────────────────────────────────────────
+      const broadcastStatus = (status) => {
+        const msg = JSON.stringify({ type: 'device:status', payload: { deviceId: device.id, status } });
+        fastify.websocketServer.clients.forEach(ws => {
+          if (ws.readyState === 1) ws.send(msg);
         });
       };
 
-      await connectWithTimeout(device.ip, { port: device.port || 502 });
-      client.setID(device.slaveId || 1);
-      client.setTimeout(3000);
+      // ── Client factory ──────────────────────────────────────────────────────
+      // Always creates a brand-new ModbusRTU instance on (re)connect.
+      // Reusing the same client after a TCP drop is unreliable — the internal
+      // socket can be in an inconsistent state that connectTCP alone doesn't fix.
+      const createClient = () => new Promise((resolve, reject) => {
+        const c = new ModbusRTU();
+        c.on('error', (err) => {
+          console.error(`[Modbus] Socket error on "${device.name}":`, err.message);
+        });
+        const timer = setTimeout(() => reject(new Error('Connection timeout')), 5000);
+        c.connectTCP(device.ip, { port: device.port || 502 })
+          .then(() => {
+            clearTimeout(timer);
+            c.setID(device.slaveId || 1);
+            c.setTimeout(3000);
+            resolve(c);
+          })
+          .catch((err) => {
+            clearTimeout(timer);
+            reject(err);
+          });
+      });
+
+      // Initial connection
+      let client = await createClient();
       clients.set(device.id, client);
       console.log(`[Modbus] Connected to "${device.name}" at ${device.ip}:${device.port}`);
       console.log(`[Modbus] "${device.name}" has ${blocks.length} group(s) to poll`);
 
-      let isPolling = false;
-      let lastSuccessfulPoll = 0;
-      let isDeviceOnline = false;
+      let isPolling        = false;
+      let isConnected      = true;   // our own reliable connection flag
+      let isDeviceOnline   = false;
+      let consecutiveFailures = 0;
+      let reconnectTimer   = null;   // prevents stacking reconnect attempts
+
+      // ── Reconnect scheduler ─────────────────────────────────────────────────
+      // Runs outside the polling interval to avoid blocking it.
+      // Uses exponential backoff and always creates a fresh client instance.
+      const scheduleReconnect = (delayMs = 2000) => {
+        if (reconnectTimer) return; // already scheduled
+        reconnectTimer = setTimeout(async () => {
+          reconnectTimer = null;
+          try { client.close(); } catch {} // close old socket first
+          try {
+            console.log(`[Modbus] Reconnecting to "${device.name}" (${device.ip})...`);
+            client = await createClient();
+            clients.set(device.id, client);
+            isConnected = true;
+            consecutiveFailures = 0;
+            blocks.forEach(b => { b.lastPoll = 0; }); // poll immediately on reconnect
+            console.log(`[Modbus] Reconnected to "${device.name}" successfully.`);
+          } catch (err) {
+            console.error(`[Modbus] Reconnection failed for "${device.name}": ${err.message}. Retrying...`);
+            isConnected = false;
+            scheduleReconnect(Math.min(delayMs * 2, 30000)); // exponential backoff, max 30s
+          }
+        }, delayMs);
+      };
+
+      // ── Polling interval (100 ms tick, each block respects its readInterval) ─
       const interval = setInterval(async () => {
         if (isPolling) return;
         isPolling = true;
 
+        // If socket is known dead, wait for scheduleReconnect to fix it
+        if (!isConnected) {
+          isPolling = false;
+          return;
+        }
+
         const now = Date.now();
         const payload = {};
-
-        // Automatic reconnect if port was closed
-        if (!client.isOpen) {
-          try {
-            console.log(`[Modbus] Port closed. Attempting to reconnect to "${device.name}" (${device.ip})...`);
-            await client.connectTCP(device.ip, { port: device.port || 502 });
-            client.setID(device.slaveId || 1);
-            console.log(`[Modbus] Reconnected to "${device.name}" successfully.`);
-          } catch (err) {
-            console.error(`[Modbus] Reconnection failed for "${device.name}":`, err.message);
-            isPolling = false;
-            return;
-          }
-        }
+        let blocksPolledThisTick = 0;
+        let connectionLost = false;
 
         for (const block of blocks) {
           if (now - block.lastPoll < block.readInterval) continue;
           block.lastPoll = now;
+          blocksPolledThisTick++;
 
-          // Memoize reads: key = absolute register address, value = Buffer (2 bytes per reg)
           const regCache = new Map();
 
           for (const tag of block.tags) {
+            if (connectionLost) break; // abort remaining tags if socket died
             try {
               const absAddr = block.startAddress + tag.registerOffset;
 
-              // Read from cache or fetch from PLC
               if (!regCache.has(absAddr)) {
                 try {
                   const data = await client.readHoldingRegisters(absAddr, tag.regSize);
                   regCache.set(absAddr, data.buffer);
                 } catch (readErr) {
-                  // This specific register is not supported — skip tag, but continue with others
+                  if (isConnectionError(readErr)) {
+                    // TCP socket is dead — stop all reads and schedule reconnect
+                    console.warn(`[Modbus] Connection lost on "${device.name}": ${readErr.message}`);
+                    connectionLost = true;
+                    isConnected = false;
+                    break;
+                  }
+                  // Non-fatal (unsupported register, bad address, etc.) — skip tag only
                   console.warn(`[Modbus] "${device.name}" reg ${absAddr} (tag "${tag.name}") skipped: ${readErr.message}`);
-                  regCache.set(absAddr, null); // mark as failed so we don't retry this cycle
+                  regCache.set(absAddr, null);
                   continue;
                 }
               }
 
               const buf = regCache.get(absAddr);
-              if (!buf) continue; // previously failed this cycle
+              if (!buf) continue;
 
               const val = parseBufferValue(buf, tag.dataType, tag.bitOffset ?? tag.bitPosition);
               const key = `${device.name}.${block.group.name}.${tag.name}`;
@@ -198,44 +236,58 @@ async function startDevicePolling(fastify, specificId = null) {
               console.error(`[Modbus] "${device.name}" tag "${tag.name}" error:`, tagErr.message);
             }
           }
+
+          if (connectionLost) break; // abort remaining blocks
         }
 
-        if (Object.keys(payload).length > 0) {
-          const message = JSON.stringify({ type: 'DATA_UPDATE', deviceId: device.id, payload });
-          fastify.websocketServer.clients.forEach(ws => {
-            if (ws.readyState === 1) ws.send(message);
-          });
-        }
-
-        lastSuccessfulPoll = now;
-
-        // Send device:status when coming back online
-        if (!isDeviceOnline) {
-          isDeviceOnline = true;
-          const statusMessage = JSON.stringify({ type: 'device:status', deviceId: device.id, status: 'connected' });
-          fastify.websocketServer.clients.forEach(ws => {
-            if (ws.readyState === 1) ws.send(statusMessage);
-          });
-          console.log(`[Modbus] Device "${device.name}" is ONLINE`);
-        }
-
-        // Check if device is offline (no successful polls for 3 seconds)
-        if (isDeviceOnline && (now - lastSuccessfulPoll) > 3000) {
-          isDeviceOnline = false;
-          const statusMessage = JSON.stringify({ type: 'device:status', deviceId: device.id, status: 'disconnected' });
-          fastify.websocketServer.clients.forEach(ws => {
-            if (ws.readyState === 1) ws.send(statusMessage);
-          });
-          console.log(`[Modbus] Device "${device.name}" is OFFLINE`);
+        // ── Health evaluation ─────────────────────────────────────────────────
+        if (connectionLost) {
+          // Socket died mid-tick — go offline and start reconnect process
+          consecutiveFailures++;
+          if (isDeviceOnline) {
+            isDeviceOnline = false;
+            broadcastStatus('disconnected');
+            console.log(`[Modbus] Device "${device.name}" is OFFLINE`);
+          }
+          scheduleReconnect(2000);
+        } else if (blocksPolledThisTick > 0) {
+          if (Object.keys(payload).length > 0) {
+            // Successful reads — broadcast data and mark online
+            const message = JSON.stringify({ type: 'DATA_UPDATE', deviceId: device.id, payload });
+            fastify.websocketServer.clients.forEach(ws => {
+              if (ws.readyState === 1) ws.send(message);
+            });
+            consecutiveFailures = 0;
+            if (!isDeviceOnline) {
+              isDeviceOnline = true;
+              broadcastStatus('connected');
+              console.log(`[Modbus] Device "${device.name}" is ONLINE`);
+            }
+          } else {
+            // Blocks were due but all reads produced nothing (non-fatal errors)
+            consecutiveFailures++;
+            if (isDeviceOnline && consecutiveFailures >= 3) {
+              isDeviceOnline = false;
+              broadcastStatus('disconnected');
+              console.log(`[Modbus] Device "${device.name}" is OFFLINE (${consecutiveFailures} empty polls)`);
+            }
+          }
         }
 
         isPolling = false;
-      }, 100); // Engine ticks every 100ms, each block respects its own readInterval
+      }, 100);
 
       activeIntervals.set(device.id, interval);
 
     } catch (err) {
       console.error(`[Modbus] Failed to connect to "${device.name}":`, err.message);
+      // Notify frontend immediately so it doesn't stay stuck on "Connecting…"
+      try {
+        const msg = JSON.stringify({ type: 'device:status', payload: { deviceId: device.id, status: 'disconnected' } });
+        fastify.websocketServer.clients.forEach(ws => {
+          if (ws.readyState === 1) ws.send(msg);
+        });
+      } catch {}
     }
   }
 }
