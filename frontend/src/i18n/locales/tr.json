@@ -1,0 +1,109 @@
+{
+  "common": {
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "delete": "Sil",
+    "edit": "Düzenle",
+    "add": "Ekle",
+    "close": "Kapat",
+    "confirm": "Onayla",
+    "search": "Ara...",
+    "loading": "Yükleniyor...",
+    "noData": "Veri yok",
+    "actions": "İşlemler",
+    "status": "Durum",
+    "name": "Ad",
+    "value": "Değer",
+    "unit": "Birim",
+    "time": "Zaman",
+    "group": "Grup",
+    "device": "Cihaz",
+    "yes": "Evet",
+    "no": "Hayır"
+  },
+  "auth": {
+    "login": "Giriş Yap",
+    "logout": "Çıkış",
+    "username": "Kullanıcı Adı",
+    "password": "Parola",
+    "guestMode": "Misafir olarak devam et",
+    "loginError": "Kullanıcı adı veya parola hatalı",
+    "loggedInAs": "Giriş yapıldı",
+    "role": {
+      "guest": "Misafir",
+      "operator": "Operatör",
+      "supervisor": "Süpervizör",
+      "admin": "Yönetici"
+    }
+  },
+  "nav": {
+    "dashboard": "Gösterge Paneli",
+    "tags": "Tag Listesi",
+    "trends": "Trendler",
+    "alarms": "Alarmlar",
+    "reports": "Raporlar",
+    "devices": "Cihazlar",
+    "settings": "Ayarlar"
+  },
+  "dashboard": {
+    "title": "Gösterge Paneli",
+    "subtitle": "Anlık sistem durumu",
+    "activeAlarms": "Aktif Alarm",
+    "onlineDevices": "Çevrimiçi Cihaz",
+    "totalTags": "Toplam Tag",
+    "lastUpdate": "Son güncelleme"
+  },
+  "tags": {
+    "title": "Tag Listesi",
+    "subtitle": "Anlık tag değerleri",
+    "addTag": "Tag Ekle",
+    "editTag": "Tag Düzenle",
+    "address": "Adres",
+    "type": "Tür",
+    "dataType": "Veri Tipi",
+    "scale": "Ölçek",
+    "writable": "Yazılabilir",
+    "quality": {
+      "good": "İyi",
+      "bad": "Hatalı",
+      "uncertain": "Belirsiz"
+    }
+  },
+  "alarms": {
+    "title": "Alarmlar",
+    "active": "Aktif",
+    "history": "Geçmiş",
+    "noActive": "Aktif alarm yok",
+    "acknowledge": "Onayla",
+    "severity": {
+      "warning": "Uyarı",
+      "critical": "Kritik"
+    },
+    "type": {
+      "high": "Yüksek Limit",
+      "low": "Düşük Limit",
+      "comm_error": "Bağlantı Hatası",
+      "bad_quality": "Kötü Kalite"
+    },
+    "triggeredAt": "Tetiklenme",
+    "clearedAt": "Kapanma",
+    "ackedBy": "Onaylayan"
+  },
+  "devices": {
+    "title": "Cihaz Yönetimi",
+    "addDevice": "Cihaz Ekle",
+    "ip": "IP Adresi",
+    "port": "Port",
+    "slaveId": "Slave ID",
+    "pollingInterval": "Polling Aralığı (ms)",
+    "connected": "Bağlı",
+    "disconnected": "Bağlantı Yok",
+    "error": "Hata"
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "language": "Dil",
+    "appearance": "Görünüm",
+    "users": "Kullanıcılar"
+  }
+}

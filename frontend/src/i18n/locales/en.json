@@ -1,0 +1,109 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "close": "Close",
+    "confirm": "Confirm",
+    "search": "Search...",
+    "loading": "Loading...",
+    "noData": "No data",
+    "actions": "Actions",
+    "status": "Status",
+    "name": "Name",
+    "value": "Value",
+    "unit": "Unit",
+    "time": "Time",
+    "group": "Group",
+    "device": "Device",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "username": "Username",
+    "password": "Password",
+    "guestMode": "Continue as guest",
+    "loginError": "Invalid username or password",
+    "loggedInAs": "Logged in as",
+    "role": {
+      "guest": "Guest",
+      "operator": "Operator",
+      "supervisor": "Supervisor",
+      "admin": "Administrator"
+    }
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "tags": "Tag List",
+    "trends": "Trends",
+    "alarms": "Alarms",
+    "reports": "Reports",
+    "devices": "Devices",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Live system overview",
+    "activeAlarms": "Active Alarms",
+    "onlineDevices": "Online Devices",
+    "totalTags": "Total Tags",
+    "lastUpdate": "Last update"
+  },
+  "tags": {
+    "title": "Tag List",
+    "subtitle": "Live tag values",
+    "addTag": "Add Tag",
+    "editTag": "Edit Tag",
+    "address": "Address",
+    "type": "Type",
+    "dataType": "Data Type",
+    "scale": "Scale",
+    "writable": "Writable",
+    "quality": {
+      "good": "Good",
+      "bad": "Bad",
+      "uncertain": "Uncertain"
+    }
+  },
+  "alarms": {
+    "title": "Alarms",
+    "active": "Active",
+    "history": "History",
+    "noActive": "No active alarms",
+    "acknowledge": "Acknowledge",
+    "severity": {
+      "warning": "Warning",
+      "critical": "Critical"
+    },
+    "type": {
+      "high": "High Limit",
+      "low": "Low Limit",
+      "comm_error": "Communication Error",
+      "bad_quality": "Bad Quality"
+    },
+    "triggeredAt": "Triggered At",
+    "clearedAt": "Cleared At",
+    "ackedBy": "Acked By"
+  },
+  "devices": {
+    "title": "Device Management",
+    "addDevice": "Add Device",
+    "ip": "IP Address",
+    "port": "Port",
+    "slaveId": "Slave ID",
+    "pollingInterval": "Polling Interval (ms)",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "error": "Error"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "appearance": "Appearance",
+    "users": "Users"
+  }
+}
