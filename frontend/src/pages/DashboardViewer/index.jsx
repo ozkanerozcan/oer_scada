@@ -68,6 +68,11 @@ export default function DashboardViewer() {
     setSelectedId(null)
   }, [id, location.state, isAdmin])
 
+  // ── ALL hooks must be declared before any early return ─────────────────────
+  // (React Rules of Hooks: never call hooks after a conditional return)
+  const handleSelect   = useCallback(widgetId => setSelectedId(widgetId), [])
+  const handleDeselect = useCallback(() => setSelectedId(null), [])
+
   // Non-admins can only see visible pages
   if (!page || (!page.isVisible && !isAdmin)) {
     return (
@@ -82,9 +87,6 @@ export default function DashboardViewer() {
       </div>
     )
   }
-
-  const handleSelect = useCallback(id => setSelectedId(id), [])
-  const handleDeselect = useCallback(() => setSelectedId(null), [])
 
   const handleUpdate = async () => {
     if (!id) return

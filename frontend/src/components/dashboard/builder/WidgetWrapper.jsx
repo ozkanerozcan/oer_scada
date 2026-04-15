@@ -1,5 +1,6 @@
 import { useRef, useCallback } from 'react'
 import PropTypes from 'prop-types'
+import { Copy, Trash2 } from 'lucide-react'
 import ValueCard from '../widgets/ValueCard'
 import LEDIndicator from '../widgets/LEDIndicator'
 import DonutChart from '../widgets/DonutChart'
@@ -34,8 +35,10 @@ export default function WidgetWrapper({
   cellH,
   isEditing,
 }) {
-  const resizeWidget = useDashboardStore(s => s.resizeWidget)
-  const moveWidget   = useDashboardStore(s => s.moveWidget)
+  const resizeWidget    = useDashboardStore(s => s.resizeWidget)
+  const moveWidget      = useDashboardStore(s => s.moveWidget)
+  const removeWidget    = useDashboardStore(s => s.removeWidget)
+  const duplicateWidget = useDashboardStore(s => s.duplicateWidget)
 
   const dragRef  = useRef(null)
   const resRef   = useRef(null)
@@ -167,24 +170,95 @@ export default function WidgetWrapper({
         />
       ))}
 
-      {/* Selected label chip */}
+      {/* ── Selected label chip with action buttons ── */}
       {isSelected && isEditing && (
-        <div style={{
-          position: 'absolute',
-          top: -24,
-          left: 0,
-          background: 'var(--accent)',
-          color: '#fff',
-          fontSize: 10,
-          fontWeight: 700,
-          padding: '2px 8px',
-          borderRadius: '4px 4px 0 0',
-          letterSpacing: '0.05em',
-          textTransform: 'uppercase',
-          whiteSpace: 'nowrap',
-          pointerEvents: 'none',
-        }}>
-          {widget.type}
+        <div
+          style={{
+            position: 'absolute',
+            top: -30,
+            left: 0,
+            display: 'flex',
+            alignItems: 'stretch',
+            gap: 0,
+            pointerEvents: 'auto',
+            zIndex: 30,
+          }}
+          onMouseDown={e => e.stopPropagation()} // don't start drag from chip
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Widget type label */}
+          <div style={{
+            background: 'var(--accent)',
+            color: '#fff',
+            fontSize: 10,
+            fontWeight: 700,
+            padding: '3px 10px',
+            borderRadius: '5px 0 0 0',
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+          }}>
+            {widget.type.replace(/([A-Z])/g, ' $1').trim()}
+          </div>
+
+          {/* Duplicate button */}
+          <button
+            title="Duplicate widget"
+            onClick={(e) => {
+              e.stopPropagation()
+              const newId = duplicateWidget(widget.id)
+              if (newId) onSelect(newId)
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '3px 10px',
+              background: 'rgba(20,184,166,0.85)',
+              color: '#fff',
+              border: 'none',
+              borderLeft: '1px solid rgba(255,255,255,0.15)',
+              fontSize: 10, fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              backdropFilter: 'blur(4px)',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(20,184,166,1)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(20,184,166,0.85)'}
+          >
+            <Copy size={11} />
+            Duplicate
+          </button>
+
+          {/* Delete button */}
+          <button
+            title="Delete widget"
+            onClick={(e) => {
+              e.stopPropagation()
+              removeWidget(widget.id)
+              onSelect(null)
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '3px 10px',
+              background: 'rgba(239,68,68,0.85)',
+              color: '#fff',
+              border: 'none',
+              borderLeft: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: '0 5px 0 0',
+              fontSize: 10, fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              backdropFilter: 'blur(4px)',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,1)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.85)'}
+          >
+            <Trash2 size={11} />
+            Delete
+          </button>
         </div>
       )}
     </div>

@@ -1,7 +1,23 @@
 import PropTypes from 'prop-types'
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import useDashboardStore from '@/pages/DashboardBuilder/useDashboardStore'
-import { Trash2, X, Link, LinkIcon, Unlink } from 'lucide-react'
+import useWatchStore from '@/stores/watchStore'
+import { Trash2, X, Unlink } from 'lucide-react'
+
+// ── Shared watch-list hook ──────────────────────────────────────
+// Fetches once on first use; subsequent callers get cached data immediately.
+function useWatchList() {
+  const items   = useWatchStore(s => s.items)
+  const loading = useWatchStore(s => s.loading)
+  const loaded  = useWatchStore(s => s.loaded)
+  const fetchFn = useWatchStore(s => s.fetch)
+
+  useEffect(() => {
+    if (!loaded && !loading) fetchFn()
+  }, [loaded, loading, fetchFn])
+
+  return { watchItems: items, loadingWatch: loading }
+}
 
 // ── Reusable form controls ──────────────────────────────────────
 function Row({ label, children }) {
@@ -136,86 +152,30 @@ function NumberInput({ value, onChange, min, max }) {
 
 // ── Widget-specific config panels ───────────────────────────────
 function ValueCardConfig({ config, update }) {
-  const [watchItems, setWatchItems] = useState([])
-  const [loadingWatch, setLoadingWatch] = useState(false)
-
-  const API = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
-
-  useEffect(() => {
-    setLoadingWatch(true)
-    fetch(`${API}/watch`)
-      .then(r => r.json())
-      .then(data => {
-        const items = Array.isArray(data) ? data : (data?.data || [])
-        setWatchItems(items)
-      })
-      .catch(() => {})
-      .finally(() => setLoadingWatch(false))
-  }, [])
-
-  const boundTag = config.tagKey || ''
+  const { watchItems, loadingWatch } = useWatchList()
 
   return (
     <>
-      {/* ── Tag Binding Section ── */}
-      <div style={{
-        background: boundTag
-          ? 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.08))'
-          : 'var(--bg-tertiary)',
-        border: `1px solid ${boundTag ? 'rgba(59,130,246,0.3)' : 'var(--border)'}`,
-        borderRadius: 10, padding: '12px 14px', marginBottom: 18,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: boundTag ? 'var(--accent)' : 'var(--text-muted)' }}>
-            {boundTag ? '🔗 Tag Bound' : '⬡ Tag Binding'}
-          </div>
-          {boundTag && (
-            <button
-              onClick={() => update({ tagKey: '' })}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex' }}
-              title="Unbind tag"
-            >
-              <Unlink size={13} />
-            </button>
-          )}
-        </div>
-        {boundTag ? (
-          <div style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--accent)', wordBreak: 'break-all', lineHeight: 1.5 }}>
-            {boundTag}
-          </div>
-        ) : (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
-            Bind to a watch list variable to display <strong>live data</strong>.
-          </div>
-        )}
-        <select
-          value={boundTag}
-          onChange={e => update({ tagKey: e.target.value })}
-          style={{
-            marginTop: boundTag ? 8 : 0,
-            width: '100%',
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            color: 'var(--text-primary)',
-            fontSize: 11,
-            padding: '6px 8px',
-            fontFamily: 'inherit',
-            outline: 'none',
-            cursor: 'pointer',
-          }}
-        >
-          <option value="">{loadingWatch ? 'Loading...' : '— None (static value) —'}</option>
-          {watchItems.map(w => (
-            <option key={w.id} value={w.tagKey}>
-              {w.tagKey}{w.dataType ? ` [${w.dataType}]` : ''}
-            </option>
-          ))}
-          {watchItems.length === 0 && !loadingWatch && (
-            <option disabled>No variables in watch list</option>
-          )}
-        </select>
+      {/* ── Tag Binding ── */}
+      <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6 }}>
+        Current Value
       </div>
+      <TagBindRow
+        label="Bind value to tag"
+        tagKey={config.tagKey || ''}
+        watchItems={watchItems}
+        loadingWatch={loadingWatch}
+        onTagChange={v => update({ tagKey: v })}
+        staticInput={
+          <input
+            className="input"
+            value={config.value ?? ''}
+            onChange={e => update({ value: e.target.value })}
+            placeholder="e.g. 2369"
+            style={{ fontSize: 12, padding: '5px 8px', marginTop: 4 }}
+          />
+        }
+      />
 
       <Row label="Show Title">
         <Toggle value={config.showTitle} onChange={v => update({ showTitle: v })} label={config.showTitle ? 'Visible' : 'Hidden'} />
@@ -225,9 +185,6 @@ function ValueCardConfig({ config, update }) {
           <TextInput value={config.title} onChange={v => update({ title: v })} placeholder="Card title" />
         </Row>
       )}
-      <Row label="Static Value">
-        <TextInput value={config.value} onChange={v => update({ value: v })} placeholder={boundTag ? 'Overridden by binding' : 'e.g. 2369'} />
-      </Row>
       <Row label="Show Unit">
         <Toggle value={config.showUnit} onChange={v => update({ showUnit: v })} label={config.showUnit ? 'Visible' : 'Hidden'} />
       </Row>
@@ -236,14 +193,7 @@ function ValueCardConfig({ config, update }) {
           <TextInput value={config.unit} onChange={v => update({ unit: v })} placeholder="e.g. pcs, km/h" />
         </Row>
       )}
-      <Row label="Font Size">
-        <SelectInput value={config.fontSize} onChange={v => update({ fontSize: v })} options={[
-          { value: 'small', label: 'Small' },
-          { value: 'medium', label: 'Medium' },
-          { value: 'large', label: 'Large (default)' },
-          { value: 'xl', label: 'Extra Large' },
-        ]} />
-      </Row>
+
       <Row label="Accent Color">
         <ColorInput value={config.accentColor} onChange={v => update({ accentColor: v })} />
       </Row>
@@ -252,90 +202,36 @@ function ValueCardConfig({ config, update }) {
 }
 
 function LEDConfig({ config, update }) {
-  const [watchItems, setWatchItems] = useState([])
-  const [loadingWatch, setLoadingWatch] = useState(false)
-
-  const API = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
-
-  useEffect(() => {
-    setLoadingWatch(true)
-    fetch(`${API}/watch`)
-      .then(r => r.json())
-      .then(data => {
-        const items = Array.isArray(data) ? data : (data?.data || [])
-        // Filter to boolean data types only
-        const boolItems = items.filter(w => {
-          const dt = (w.dataType || '').toLowerCase()
-          return dt === 'bool' || dt === 'boolean'
-        })
-        setWatchItems(boolItems)
-      })
-      .catch(() => {})
-      .finally(() => setLoadingWatch(false))
-  }, [])
-
-  const boundTag = config.tagKey || ''
+  const { watchItems: allWatch, loadingWatch } = useWatchList()
+  // LED only accepts Boolean tags
+  const watchItems = allWatch.filter(w => {
+    const dt = (w.dataType || '').toLowerCase()
+    return dt === 'bool' || dt === 'boolean'
+  })
 
   return (
     <>
-      {/* ── Tag Binding Section ── */}
-      <div style={{
-        background: boundTag
-          ? 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.08))'
-          : 'var(--bg-tertiary)',
-        border: `1px solid ${boundTag ? 'rgba(59,130,246,0.3)' : 'var(--border)'}`,
-        borderRadius: 10, padding: '12px 14px', marginBottom: 18,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: boundTag ? 'var(--accent)' : 'var(--text-muted)' }}>
-            {boundTag ? '🔗 Tag Bound' : '⬡ Tag Binding'}
-          </div>
-          {boundTag && (
-            <button
-              onClick={() => update({ tagKey: '' })}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex' }}
-              title="Unbind tag"
-            >
-              <Unlink size={13} />
-            </button>
-          )}
-        </div>
-        {boundTag ? (
-          <div style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--accent)', wordBreak: 'break-all', lineHeight: 1.5 }}>
-            {boundTag}
-          </div>
-        ) : (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
-            Select a <strong>Boolean</strong> watch item to drive this LED from live data.
-          </div>
-        )}
-
-        <select
-          value={boundTag}
-          onChange={e => update({ tagKey: e.target.value })}
-          style={{
-            marginTop: boundTag ? 8 : 0,
-            width: '100%',
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            color: 'var(--text-primary)',
-            fontSize: 11,
-            padding: '6px 8px',
-            fontFamily: 'inherit',
-            outline: 'none',
-            cursor: 'pointer',
-          }}
-        >
-          <option value="">{loadingWatch ? 'Loading...' : '— None (manual) —'}</option>
-          {watchItems.map(w => (
-            <option key={w.id} value={w.tagKey}>{w.tagKey}</option>
-          ))}
-          {watchItems.length === 0 && !loadingWatch && (
-            <option disabled>No boolean tags in watch list</option>
-          )}
-        </select>
+      {/* ── Tag Binding ── */}
+      <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6 }}>
+        Live State Source
       </div>
+      <TagBindRow
+        label="Bind state to tag (Boolean)"
+        tagKey={config.tagKey || ''}
+        watchItems={watchItems}
+        loadingWatch={loadingWatch}
+        onTagChange={v => update({ tagKey: v })}
+        emptyLabel={loadingWatch ? 'Loading…' : watchItems.length === 0 ? 'No boolean tags in watch list' : '— None (manual state) —'}
+        staticInput={
+          <div style={{ marginTop: 4 }}>
+            <Toggle
+              value={config.state}
+              onChange={v => update({ state: v })}
+              label={config.state ? (config.onText || 'ON') : (config.offText || 'OFF')}
+            />
+          </div>
+        }
+      />
 
       <Row label="Show Label">
         <Toggle value={config.showLabel} onChange={v => update({ showLabel: v })} label={config.showLabel ? 'Visible' : 'Hidden'} />
@@ -345,9 +241,6 @@ function LEDConfig({ config, update }) {
           <TextInput value={config.label} onChange={v => update({ label: v })} placeholder="e.g. Motor Status" />
         </Row>
       )}
-      <Row label="State">
-        <Toggle value={config.state} onChange={v => update({ state: v })} label={config.state ? (config.onText || 'ON') : (config.offText || 'OFF')} />
-      </Row>
       <Row label="ON Color">
         <ColorInput value={config.onColor} onChange={v => update({ onColor: v })} />
       </Row>
@@ -360,14 +253,7 @@ function LEDConfig({ config, update }) {
       <Row label="OFF Text">
         <TextInput value={config.offText} onChange={v => update({ offText: v })} placeholder="e.g. STOPPED" />
       </Row>
-      <Row label="LED Size">
-        <SelectInput value={config.ledSize} onChange={v => update({ ledSize: v })} options={[
-          { value: 'small',  label: 'Small' },
-          { value: 'medium', label: 'Medium (default)' },
-          { value: 'large',  label: 'Large' },
-          { value: 'xl',     label: 'Extra Large' },
-        ]} />
-      </Row>
+
       <Row label="Blink when ON">
         <Toggle value={config.blink} onChange={v => update({ blink: v })} label={config.blink ? 'Enabled' : 'Disabled'} />
       </Row>
@@ -375,7 +261,79 @@ function LEDConfig({ config, update }) {
   )
 }
 
+// ── Shared tag-binding row — used by all widget config panels ───
+// staticInput: JSX rendered below the dropdown when no tag is bound
+// emptyLabel:  custom placeholder text for the "no tag" option
+function TagBindRow({ label, tagKey, watchItems, loadingWatch, onTagChange, staticInput, emptyLabel }) {
+  const bound = !!tagKey
+  return (
+    <div style={{
+      background: bound
+        ? 'linear-gradient(135deg, rgba(20,184,166,0.08), rgba(6,182,212,0.08))'
+        : 'var(--bg-tertiary)',
+      border: `1px solid ${bound ? 'rgba(20,184,166,0.35)' : 'var(--border)'}`,
+      borderRadius: 10, padding: '10px 12px', marginBottom: 12,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: bound ? '#14b8a6' : 'var(--text-muted)' }}>
+          {label}{bound ? ' 🔗' : ''}
+        </div>
+        {bound && (
+          <button
+            onClick={() => onTagChange('')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex' }}
+            title="Unbind tag"
+          >
+            <Unlink size={12} />
+          </button>
+        )}
+      </div>
+
+      {/* Tag selector */}
+      <select
+        value={tagKey || ''}
+        onChange={e => onTagChange(e.target.value)}
+        style={{
+          width: '100%',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+          color: 'var(--text-primary)',
+          fontSize: 11,
+          padding: '5px 8px',
+          fontFamily: 'inherit',
+          outline: 'none',
+          cursor: 'pointer',
+          marginBottom: bound ? 0 : 4,
+        }}
+      >
+        <option value="">{loadingWatch ? 'Loading…' : (emptyLabel || '— Static value —')}</option>
+        {watchItems.map(w => (
+          <option key={w.id} value={w.tagKey}>
+            {w.tagKey}{w.dataType ? ` [${w.dataType}]` : ''}
+          </option>
+        ))}
+        {watchItems.length === 0 && !loadingWatch && (
+          <option disabled>No variables in watch list</option>
+        )}
+      </select>
+
+      {/* Static fallback — shown when no tag is bound */}
+      {!bound && staticInput}
+
+      {/* Bound tag key display */}
+      {bound && (
+        <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#14b8a6', wordBreak: 'break-all', lineHeight: 1.5, marginTop: 4 }}>
+          {tagKey}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function DonutConfig({ config, update }) {
+  const { watchItems, loadingWatch } = useWatchList()
+
   return (
     <>
       <Row label="Show Title">
@@ -386,12 +344,68 @@ function DonutConfig({ config, update }) {
           <TextInput value={config.title} onChange={v => update({ title: v })} placeholder="Chart title" />
         </Row>
       )}
-      <Row label="Current Value">
-        <NumberInput value={config.value} onChange={v => update({ value: v })} min={0} />
-      </Row>
-      <Row label="Max Value">
-        <NumberInput value={config.maxValue} onChange={v => update({ maxValue: v })} min={1} />
-      </Row>
+
+      {/* ── Current Value ── */}
+      <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6 }}>
+        Current Value
+      </div>
+      <TagBindRow
+        label="Bind value to tag"
+        tagKey={config.tagKey || ''}
+        watchItems={watchItems}
+        loadingWatch={loadingWatch}
+        onTagChange={v => update({ tagKey: v })}
+        staticInput={
+          <input type="number" className="input"
+            value={config.value ?? 0}
+            onChange={e => update({ value: Number(e.target.value) })}
+            placeholder="e.g. 65"
+            style={{ fontSize: 12, padding: '5px 8px', marginTop: 4 }}
+          />
+        }
+      />
+
+      {/* ── Min Value ── */}
+      <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6 }}>
+        Min Value
+      </div>
+      <TagBindRow
+        label="Bind min to tag"
+        tagKey={config.minTagKey || ''}
+        watchItems={watchItems}
+        loadingWatch={loadingWatch}
+        onTagChange={v => update({ minTagKey: v })}
+        staticInput={
+          <input type="number" className="input"
+            value={config.minValue ?? 0}
+            onChange={e => update({ minValue: Number(e.target.value) })}
+            placeholder="e.g. 0"
+            style={{ fontSize: 12, padding: '5px 8px', marginTop: 4 }}
+          />
+        }
+      />
+
+      {/* ── Max Value ── */}
+      <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6 }}>
+        Max Value
+      </div>
+      <TagBindRow
+        label="Bind max to tag"
+        tagKey={config.maxTagKey || ''}
+        watchItems={watchItems}
+        loadingWatch={loadingWatch}
+        onTagChange={v => update({ maxTagKey: v })}
+        staticInput={
+          <input type="number" className="input"
+            value={config.maxValue ?? 100}
+            min={1}
+            onChange={e => update({ maxValue: Number(e.target.value) })}
+            placeholder="e.g. 100"
+            style={{ fontSize: 12, padding: '5px 8px', marginTop: 4 }}
+          />
+        }
+      />
+
       <Row label="Unit">
         <TextInput value={config.unit} onChange={v => update({ unit: v })} placeholder="e.g. %, rpm" />
       </Row>
@@ -408,13 +422,15 @@ function DonutConfig({ config, update }) {
         <Toggle value={config.showCenterLabel} onChange={v => update({ showCenterLabel: v })} label={config.showCenterLabel ? 'Visible' : 'Hidden'} />
       </Row>
       <Row label="Show as Percentage">
-        <Toggle value={config.showPercentage} onChange={v => update({ showPercentage: v })} label={config.showPercentage ? 'Yes' : 'No'} />
+        <Toggle value={config.showPercentage} onChange={v => update({ showPercentage: v })} label={config.showPercentage ? 'Yes — computed from min/max' : 'No — raw value'} />
       </Row>
     </>
   )
 }
 
 function LineChartConfig({ config, update }) {
+  const { watchItems, loadingWatch } = useWatchList()
+
   return (
     <>
       <Row label="Show Title">
@@ -425,6 +441,71 @@ function LineChartConfig({ config, update }) {
           <TextInput value={config.title} onChange={v => update({ title: v })} placeholder="Chart title" />
         </Row>
       )}
+
+      {/* ── Current Value (data source) ── */}
+      <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6 }}>
+        Data Source
+      </div>
+      <TagBindRow
+        label="Bind value to tag"
+        tagKey={config.tagKey || ''}
+        watchItems={watchItems}
+        loadingWatch={loadingWatch}
+        onTagChange={v => update({ tagKey: v })}
+        emptyLabel={loadingWatch ? 'Loading…' : '— None (demo data) —'}
+        staticInput={
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+            No tag bound — demo data is shown.
+          </div>
+        }
+      />
+
+      {/* ── Y-Axis Min ── */}
+      <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6 }}>
+        Y-Axis Min
+      </div>
+      <TagBindRow
+        label="Bind Y-min to tag"
+        tagKey={config.yMinTagKey || ''}
+        watchItems={watchItems}
+        loadingWatch={loadingWatch}
+        onTagChange={v => update({ yMinTagKey: v })}
+        emptyLabel={loadingWatch ? 'Loading…' : '— Auto (fit data) —'}
+        staticInput={
+          <input
+            type="number"
+            className="input"
+            value={config.yMinValue ?? ''}
+            onChange={e => update({ yMinValue: e.target.value === '' ? null : Number(e.target.value) })}
+            placeholder="Leave blank for auto"
+            style={{ fontSize: 12, padding: '5px 8px', marginTop: 4 }}
+          />
+        }
+      />
+
+      {/* ── Y-Axis Max ── */}
+      <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6 }}>
+        Y-Axis Max
+      </div>
+      <TagBindRow
+        label="Bind Y-max to tag"
+        tagKey={config.yMaxTagKey || ''}
+        watchItems={watchItems}
+        loadingWatch={loadingWatch}
+        onTagChange={v => update({ yMaxTagKey: v })}
+        emptyLabel={loadingWatch ? 'Loading…' : '— Auto (fit data) —'}
+        staticInput={
+          <input
+            type="number"
+            className="input"
+            value={config.yMaxValue ?? ''}
+            onChange={e => update({ yMaxValue: e.target.value === '' ? null : Number(e.target.value) })}
+            placeholder="Leave blank for auto"
+            style={{ fontSize: 12, padding: '5px 8px', marginTop: 4 }}
+          />
+        }
+      />
+
       <Row label="Line Color">
         <ColorInput value={config.lineColor} onChange={v => update({ lineColor: v })} />
       </Row>
@@ -432,7 +513,7 @@ function LineChartConfig({ config, update }) {
         <TextInput value={config.yAxisUnit} onChange={v => update({ yAxisUnit: v })} placeholder="e.g. °C, bar" />
       </Row>
       <Row label="Data Points">
-        <NumberInput value={config.pointCount} onChange={v => update({ pointCount: v })} min={5} max={60} />
+        <NumberInput value={config.pointCount} onChange={v => update({ pointCount: v })} min={5} max={120} />
       </Row>
       <Row label="Show Grid Lines">
         <Toggle value={config.showGrid} onChange={v => update({ showGrid: v })} label={config.showGrid ? 'Visible' : 'Hidden'} />

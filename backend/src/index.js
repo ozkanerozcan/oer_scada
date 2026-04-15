@@ -349,11 +349,24 @@ fastify.post('/api/watch', async (request) => {
   if (info.changes === 0 && dataType) {
     db.prepare('UPDATE watch_items SET dataType=? WHERE tagKey=?').run(dataType, tagKey);
   }
+  // Restart OPC UA polling for the affected device so the new tag is monitored immediately
+  if (tagKey.includes('.OPCUA.')) {
+    const deviceName = tagKey.split('.OPCUA.')[0];
+    const device = db.prepare("SELECT * FROM devices WHERE name=? AND type='OPC UA'").get(deviceName);
+    if (device) OpcUaService.restartPolling(fastify, device.id);
+  }
   return { success: true, id: info.lastInsertRowid || db.prepare('SELECT id FROM watch_items WHERE tagKey=?').get(tagKey)?.id };
 });
 
 fastify.delete('/api/watch/:id', async (request) => {
+  const item = db.prepare('SELECT tagKey FROM watch_items WHERE id=?').get(request.params.id);
   db.prepare('DELETE FROM watch_items WHERE id=?').run(request.params.id);
+  // Restart OPC UA polling if an OPC UA tag was removed
+  if (item?.tagKey?.includes('.OPCUA.')) {
+    const deviceName = item.tagKey.split('.OPCUA.')[0];
+    const device = db.prepare("SELECT * FROM devices WHERE name=? AND type='OPC UA'").get(deviceName);
+    if (device) OpcUaService.restartPolling(fastify, device.id);
+  }
   return { success: true };
 });
 
@@ -370,6 +383,47 @@ fastify.register(async function (fastify) {
   fastify.get('/ws', { websocket: true }, (connection, req) => {
     connection.on('message', msg => console.log('WS:', msg.toString()));
   });
+});
+
+// ─── OPC UA ──────────────────────────────────────────────────────────────────
+fastify.post('/api/opcua/browse', async (request, reply) => {
+  const { deviceId, nodeId } = request.body;
+  const device = db.prepare('SELECT * FROM devices WHERE id=?').get(deviceId);
+  if (!device) return reply.code(404).send({ success: false, error: 'Device not found' });
+  try {
+    const nodes = await OpcUaService.browseNode(device, nodeId || null);
+    return { success: true, nodes };
+  } catch (err) {
+    return reply.code(400).send({ success: false, error: err.message });
+  }
+});
+
+fastify.post('/api/opcua/test', async (request, reply) => {
+  const { deviceId } = request.body;
+  const device = db.prepare('SELECT * FROM devices WHERE id=?').get(deviceId);
+  if (!device) return reply.code(404).send({ success: false, error: 'Device not found' });
+  try {
+    await OpcUaService.testConnection(device);
+    return { success: true, message: `Connected to ${device.opcuaEndpoint}` };
+  } catch (err) {
+    return reply.code(400).send({ success: false, error: err.message });
+  }
+});
+
+// ─── OPC UA Raw Debug Browse ─────────────────────────────────────────────────
+// Calls every reference-type strategy and returns raw unprocessed results.
+// Use this endpoint to diagnose what the Siemens PLC server actually exposes.
+// Example: POST /api/opcua/raw-browse  { "deviceId": 1, "nodeId": "ns=3;s=DataBlocksGlobal" }
+fastify.post('/api/opcua/raw-browse', async (request, reply) => {
+  const { deviceId, nodeId } = request.body;
+  const device = db.prepare('SELECT * FROM devices WHERE id=?').get(deviceId);
+  if (!device) return reply.code(404).send({ success: false, error: 'Device not found' });
+  try {
+    const results = await OpcUaService.rawBrowse(device, nodeId || null);
+    return { success: true, nodeId: nodeId || 'i=85', results };
+  } catch (err) {
+    return reply.code(400).send({ success: false, error: err.message });
+  }
 });
 
 // ─── Ping ─────────────────────────────────────────────────────────────────────
@@ -461,6 +515,7 @@ const start = async () => {
     await fastify.listen({ port: 3000, host: '0.0.0.0' });
     console.log('Fastify server is running on http://0.0.0.0:3000');
     ModbusService.startDevicePolling(fastify);
+    OpcUaService.startOpcUaPolling(fastify);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

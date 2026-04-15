@@ -54,9 +54,10 @@ const NodeRow = memo(({ node, depth, deviceId, deviceName, watchItems, onWatchTo
         paddingLeft: 16 + indent,
         gap: 8,
       }}>
-        {/* Expand toggle */}
+        {/* Expand toggle — show for any node that has children (including
+            Variable nodes that are Siemens S7 structs / UDTs with members) */}
         <div style={{ width: 20, flexShrink: 0 }}>
-          {node.isFolder ? (
+          {node.hasChildren ? (
             <button
               onClick={() => onExpand(node)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
@@ -68,11 +69,13 @@ const NodeRow = memo(({ node, depth, deviceId, deviceName, watchItems, onWatchTo
           ) : null}
         </div>
 
-        {/* Icon */}
-        <div style={{ flexShrink: 0, color: node.isFolder ? '#f59e0b' : 'var(--text-muted)' }}>
+        {/* Icon — folder for containers, tag for leaf variables */}
+        <div style={{ flexShrink: 0, color: node.isFolder ? '#f59e0b' : node.hasChildren ? '#a78bfa' : 'var(--text-muted)' }}>
           {node.isFolder
             ? (expanded ? <FolderOpen size={16} /> : <Folder size={16} />)
-            : <Tag size={14} />}
+            : node.hasChildren
+              ? (expanded ? <FolderOpen size={14} /> : <Folder size={14} />)
+              : <Tag size={14} />}
         </div>
 
         {/* Display Name */}

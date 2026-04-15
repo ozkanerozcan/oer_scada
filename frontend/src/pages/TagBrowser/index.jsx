@@ -75,20 +75,28 @@ export default function WatchTable() {
     return list
   }, [groups])
 
-  // Watched Tags ordered by DB and filtered by Search
-  const watchedTags = useMemo(() => {
-    const base = watchDb.map(w => {
-      const instance = tagInstances.find(t => t.uniqueKey === w.tagKey)
-      return { ...w, instance }
-    }).filter(w => w.instance !== undefined)
+  // ── Unified watch list (Modbus + OPC UA in one sorted list) ─────────────
+  const allWatchedTags = useMemo(() => {
+    const enriched = watchDb.map(w => {
+      const isOpcua = w.tagKey.includes('.OPCUA.')
+      if (isOpcua) {
+        const sep = w.tagKey.indexOf('.OPCUA.')
+        const deviceName = sep > -1 ? w.tagKey.slice(0, sep) : ''
+        const nodePath   = sep > -1 ? w.tagKey.slice(sep + 7) : w.tagKey
+        return { ...w, isOpcua: true, deviceName, nodePath, tagLabel: nodePath, groupName: 'OPC UA', dataTypeLabel: w.dataType || 'Unknown' }
+      } else {
+        const instance = tagInstances.find(t => t.uniqueKey === w.tagKey)
+        if (!instance) return null
+        return { ...w, isOpcua: false, deviceName: instance.deviceName, groupName: instance.groupName, tagLabel: instance.tagName, instance, dataTypeLabel: instance.dataType || w.dataType || 'Unknown' }
+      }
+    }).filter(Boolean)
 
-    if (!searchTerm) return base
-    
+    if (!searchTerm) return enriched
     const s = searchTerm.toLowerCase()
-    return base.filter(w => 
-      w.instance.deviceName.toLowerCase().includes(s) ||
-      w.instance.groupName.toLowerCase().includes(s) ||
-      w.instance.tagName.toLowerCase().includes(s)
+    return enriched.filter(w =>
+      w.deviceName.toLowerCase().includes(s) ||
+      w.groupName.toLowerCase().includes(s) ||
+      w.tagLabel.toLowerCase().includes(s)
     )
   }, [watchDb, tagInstances, searchTerm])
 
@@ -135,16 +143,16 @@ export default function WatchTable() {
   }
 
   const handleMove = async (index, direction) => {
-    const newItems = [...watchedTags]
+    const newItems = [...allWatchedTags]
     const swap = index + direction
     if (swap < 0 || swap >= newItems.length) return
-    
     ;[newItems[index], newItems[swap]] = [newItems[swap], newItems[index]]
-    
-    // update sort orders visually and push
     const payload = newItems.map((w, i) => ({ id: w.id, sortOrder: i }))
-    // optimistic
-    setWatchDb(newItems)
+    setWatchDb(prev => {
+      const map = Object.fromEntries(newItems.map(w => [w.id, w]))
+      return prev.map(w => map[w.id] ? { ...w, sortOrder: map[w.id].sortOrder } : w)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+    })
     setIsOrdering(true)
     await reorderWatchItems(payload)
     setIsOrdering(false)
@@ -208,7 +216,7 @@ export default function WatchTable() {
       <div className="card flex-col gap-0" style={{ padding: 0, borderRadius: 16, overflow: 'hidden', flex: 1, display: 'flex' }}>
         <div className="flex justify-between items-center" style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-            İzleme Listesi ({watchedTags.length}{searchTerm ? ` / ${watchDb.length}` : ''})
+            İzleme Listesi ({allWatchedTags.length}{searchTerm ? ` / ${watchDb.length}` : ''})
           </h2>
           <div className="flex items-center gap-3">
             <div style={{ position: 'relative', width: '280px' }}>
@@ -228,70 +236,141 @@ export default function WatchTable() {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 14 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
               <tr style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <th style={{ padding: '12px 24px', width: 60 }}>Sıra</th>
-                <th style={{ padding: '12px 24px' }}>Cihaz / Grup</th>
-                <th style={{ padding: '12px 24px' }}>Tag Adı</th>
-                <th style={{ padding: '12px 24px' }}>Değer</th>
-                <th style={{ padding: '12px 24px', width: 100, textAlign: 'right' }}>Aksiyon</th>
+                <th style={{ padding: '12px 16px', width: 60 }}>Sıra</th>
+                <th style={{ padding: '12px 16px', width: 160 }}>Cihaz</th>
+                <th style={{ padding: '12px 16px' }}>Tag Adı</th>
+                <th style={{ padding: '12px 16px', width: 100 }}>Data Type</th>
+                <th style={{ padding: '12px 16px', width: 140 }}>Değer</th>
+                <th style={{ padding: '12px 16px', width: 100, textAlign: 'right' }}>Aksiyon</th>
               </tr>
             </thead>
             <tbody>
-              {watchedTags.map((wTag, index) => {
-                const tag = wTag.instance
-                const valObj = values[tag.uniqueKey]
-                
+              {allWatchedTags.map((w, index) => {
+                // ── Value lookup ─────────────────────────────────────────────
+                const valueKey = w.isOpcua ? w.tagKey : (w.instance?.uniqueKey || w.tagKey)
+                const valObj   = values[valueKey]
+                const rawVal   = valObj?.value
+                const displayVal = rawVal === undefined
+                  ? '—'
+                  : typeof rawVal === 'number'
+                    ? parseFloat(rawVal.toFixed(4))
+                    : String(rawVal)
+
+                // ── Data type badge colours ───────────────────────────────────
+                const dtColors = {
+                  Bool:    { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b' },
+                  Int16:   { bg: 'rgba(59,130,246,0.12)',  color: '#3b82f6' },
+                  UInt16:  { bg: 'rgba(59,130,246,0.12)',  color: '#3b82f6' },
+                  Int32:   { bg: 'rgba(139,92,246,0.12)', color: '#8b5cf6' },
+                  UInt32:  { bg: 'rgba(139,92,246,0.12)', color: '#8b5cf6' },
+                  Float32: { bg: 'rgba(16,185,129,0.12)', color: '#10b981' },
+                  String:  { bg: 'rgba(236,72,153,0.12)', color: '#ec4899' },
+                }
+                const dtC = dtColors[w.dataTypeLabel] || { bg: 'var(--bg-tertiary)', color: 'var(--text-muted)' }
+
                 return (
-                  <tr key={wTag.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div className="flex-col gap-1">
-                        <button onClick={() => handleMove(index, -1)} disabled={index === 0} style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.3 : 1, padding: 2 }}><ChevronUp size={16} /></button>
-                        <button onClick={() => handleMove(index, 1)} disabled={index === watchedTags.length - 1} style={{ background: 'none', border: 'none', cursor: index === watchedTags.length - 1 ? 'default' : 'pointer', opacity: index === watchedTags.length - 1 ? 0.3 : 1, padding: 2 }}><ChevronDown size={16} /></button>
+                  <tr key={w.id}
+                    style={{ borderBottom: '1px solid var(--border)' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {/* ── Sıra ── */}
+                    <td style={{ padding: '10px 16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                        <button onClick={() => handleMove(index, -1)} disabled={index === 0}
+                          style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.25 : 1, padding: 2, color: 'var(--text-muted)' }}>
+                          <ChevronUp size={15} />
+                        </button>
+                        <button onClick={() => handleMove(index, 1)} disabled={index === allWatchedTags.length - 1}
+                          style={{ background: 'none', border: 'none', cursor: index === allWatchedTags.length - 1 ? 'default' : 'pointer', opacity: index === allWatchedTags.length - 1 ? 0.25 : 1, padding: 2, color: 'var(--text-muted)' }}>
+                          <ChevronDown size={15} />
+                        </button>
                       </div>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div className="flex-col gap-1">
-                        <span style={{ fontWeight: 600, color: '#ec4899' }}>{tag.deviceName}</span>
-                        <span className="text-muted" style={{ fontSize: 12 }}>{tag.groupName}</span>
-                      </div>
+
+                    {/* ── Cihaz ── */}
+                    <td style={{ padding: '10px 16px' }}>
+                      <span style={{ fontWeight: 600, color: w.isOpcua ? '#8b5cf6' : '#ec4899', fontSize: 13 }}>
+                        {w.deviceName}
+                      </span>
                     </td>
-                    <td style={{ padding: '12px 16px', fontWeight: 600 }}>{tag.tagName}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div className="flex items-center gap-2">
-                        <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
-                           {valObj?.value !== undefined 
-                             ? (typeof valObj.value === 'number' 
-                                 ? parseFloat(valObj.value.toFixed(2)) 
-                                 : valObj.value) 
-                             : '—'}
-                        </span>
-                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{tag.unit || ''}</span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                      <div className="flex justify-end gap-2 items-center">
-                        {tag.writable ? (
-                          <button 
-                             onClick={() => { setModifyModal({ tag, valObj }); setModifyValue(valObj?.value ?? '') }}
-                             className="btn btn-ghost" 
-                             style={{ padding: 6, color: '#3b82f6', borderRadius: 8 }}
-                             title="Değiştir"
-                          >
-                             <Edit3 size={16} />
-                          </button>
+
+                    {/* ── Tag Adı ── */}
+                    <td style={{ padding: '10px 16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {w.isOpcua ? (
+                          <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{
+                                fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+                                background: 'rgba(139,92,246,0.12)', color: '#8b5cf6',
+                                letterSpacing: '0.05em', textTransform: 'uppercase', flexShrink: 0,
+                              }}>OPC UA</span>
+                            </div>
+                            <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
+                              {w.nodePath}
+                            </span>
+                          </>
                         ) : (
-                          <span className="text-muted" style={{ fontSize: 12, marginRight: 8, height: 32, display: 'flex', alignItems: 'center' }}>Salt Okunur</span>
+                          <>
+                            <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>
+                              {w.groupName}
+                              <span style={{ color: 'var(--text-muted)', fontWeight: 400, margin: '0 4px' }}>|</span>
+                              {w.tagLabel}
+                            </span>
+                          </>
                         )}
-                        <button onClick={() => handleRemove(wTag.id)} className="btn btn-ghost" style={{ padding: 6, color: '#ef4444', borderRadius: 8 }} title="Kaldır">
-                          <Trash2 size={16} />
+                      </div>
+                    </td>
+
+                    {/* ── Data Type ── */}
+                    <td style={{ padding: '10px 16px' }}>
+                      {w.dataTypeLabel && w.dataTypeLabel !== 'Unknown' ? (
+                        <span style={{ background: dtC.bg, color: dtC.color, padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>
+                          {w.dataTypeLabel}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
+                      )}
+                    </td>
+
+                    {/* ── Değer ── */}
+                    <td style={{ padding: '10px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontFamily: 'monospace', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {displayVal}
+                        </span>
+                        {!w.isOpcua && w.instance?.unit && (
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{w.instance.unit}</span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* ── Aksiyon ── */}
+                    <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
+                        {!w.isOpcua && w.instance?.writable && (
+                          <button
+                            onClick={() => { setModifyModal({ tag: w.instance, valObj }); setModifyValue(rawVal ?? '') }}
+                            className="btn btn-ghost"
+                            style={{ padding: 6, color: '#3b82f6', borderRadius: 8 }}
+                            title="Değiştir"
+                          >
+                            <Edit3 size={15} />
+                          </button>
+                        )}
+                        <button onClick={() => handleRemove(w.id)} className="btn btn-ghost"
+                          style={{ padding: 6, color: '#ef4444', borderRadius: 8 }} title="Kaldır">
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     </td>
                   </tr>
                 )
               })}
-              {watchedTags.length === 0 && (
+              {allWatchedTags.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan={6} style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>
                     <div className="flex-col items-center gap-3">
                       <Eye size={48} style={{ opacity: 0.2 }} />
                       <span>İzleme tablonuzda gösterilecek değişken bulunmuyor.</span>

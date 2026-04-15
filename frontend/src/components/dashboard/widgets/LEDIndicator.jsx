@@ -2,8 +2,6 @@ import PropTypes from 'prop-types'
 import { useRef, useState, useEffect } from 'react'
 import useTagStore from '@/stores/tagStore'
 
-const SIZE_RATIO = { small: 0.35, medium: 0.55, large: 0.75, xl: 0.9 }
-
 export default function LEDIndicator({ config = {}, isPreview = false }) {
   const {
     label     = 'Status',
@@ -12,7 +10,6 @@ export default function LEDIndicator({ config = {}, isPreview = false }) {
     offColor  = '#ef4444',
     onText    = 'ON',
     offText   = 'OFF',
-    ledSize   = 'medium',
     blink     = true,
     showLabel = true,
     tagKey    = '',
@@ -57,14 +54,14 @@ export default function LEDIndicator({ config = {}, isPreview = false }) {
     )
   }
 
-  // ── Compute all sizes from measured container ─────────────────
-  const ratio     = SIZE_RATIO[ledSize] ?? SIZE_RATIO.medium
-  const ledD      = Math.round(Math.min(dims.h * ratio, dims.w * 0.22, 120))
-  const fontSize  = Math.round(Math.max(10, Math.min(dims.h * 0.3,  dims.w * 0.055, 36)))
-  const badgeFont = Math.round(Math.max(8,  Math.min(dims.h * 0.22, dims.w * 0.04,  24)))
-  const gap       = Math.round(Math.max(6,  dims.w * 0.025))
-  const padH      = Math.round(Math.max(8,  dims.w * 0.04))
-  const padV      = Math.round(Math.max(4,  dims.h * 0.12))
+  // ── Compute all sizes from measured container — no hard pixel caps ──
+  // LED diameter: ~50% of the short axis, bounded only by the long axis ratio
+  const ledD      = Math.round(Math.min(dims.h, dims.w) * 0.52)
+  const fontSize  = Math.round(Math.min(dims.h * 0.28, dims.w * 0.065))
+  const badgeFont = Math.round(Math.min(dims.h * 0.20, dims.w * 0.048))
+  const gap       = Math.round(Math.max(6, dims.w * 0.03))
+  const padH      = Math.round(Math.max(8, dims.w * 0.04))
+  const padV      = Math.round(Math.max(4, dims.h * 0.10))
 
   return (
     <div

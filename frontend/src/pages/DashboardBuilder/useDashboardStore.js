@@ -28,8 +28,12 @@ const DEFAULT_CONFIGS = {
   DonutChart: {
     title: 'Donut Chart',
     showTitle: true,
+    tagKey: '',
     value: 65,
+    minValue: 0,
+    minTagKey: '',
     maxValue: 100,
+    maxTagKey: '',
     unit: '%',
     angle: 270,
     color: '#14b8a6',
@@ -39,11 +43,16 @@ const DEFAULT_CONFIGS = {
   LineChartWidget: {
     title: 'Line Chart',
     showTitle: true,
+    tagKey: '',
     lineColor: '#3b82f6',
     yAxisUnit: '',
     showDots: false,
     showGrid: true,
     pointCount: 30,
+    yMinTagKey: '',
+    yMinValue: null,
+    yMaxTagKey: '',
+    yMaxValue: null,
   },
   TextWidget: {
     text: 'Enter your text here',
@@ -62,7 +71,7 @@ const genId = () => `widget_${idCounter++}`
 
 export const useDashboardStore = create(
   persist(
-    (set) => ({
+    (set, get) => ({
       widgets: [],
       currentPageId: null,
 
@@ -103,6 +112,24 @@ export const useDashboardStore = create(
 
       removeWidget: (id) =>
         set((s) => ({ widgets: s.widgets.filter((w) => w.id !== id) })),
+
+      duplicateWidget: (id) => {
+        const src = get().widgets.find((w) => w.id === id)
+        if (!src) return null
+        const newId = `widget_${Date.now()}`
+        const copy = {
+          ...JSON.parse(JSON.stringify(src)),
+          id: newId,
+          x: src.x + 1,
+          y: src.y + 1,
+        }
+        set((s) => ({ widgets: [...s.widgets, copy] }))
+        return newId
+      },
+
+      pasteWidget: (widget) =>
+        set((s) => ({ widgets: [...s.widgets, widget] })),
+
 
       clearCanvas: () => set({ widgets: [], currentPageId: null }),
 

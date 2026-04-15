@@ -13,9 +13,10 @@ const STATIC_NAV = [
     label: 'Tags',
     icon: Tags,
     subItems: [
+      { path: '/tags', label: 'Watch Table', icon: Activity },
+      { divider: true },
       { path: '/tags-management', label: 'Modbus TCP', icon: Settings },
       { path: '/tags-opcua', label: 'OPC UA Browser', icon: Radio },
-      { path: '/tags', label: 'Watch Table', icon: Activity },
     ]
   },
   { path: '/users', label: 'Users', icon: Users },
@@ -122,11 +123,11 @@ const Sidebar = memo(() => {
             borderRadius: sidebarOpen ? '0' : '10px',
             boxShadow: sidebarOpen ? 'none' : '0 2px 6px rgba(0,0,0,0.02)'
           }}>
-            <Building2 size={24} strokeWidth={2.5} />
+            <img src="/icon-192x192.png" alt="OER Logo" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '6px' }} />
           </div>
           {sidebarOpen && (
             <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-primary)', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              Barcode Track
+              OE Technology
             </span>
           )}
         </div>
@@ -193,16 +194,16 @@ const Sidebar = memo(() => {
                         to="/dashboard-management"
                         style={{
                           display: 'flex', alignItems: 'center', gap: '10px',
-                          padding: '7px 12px', borderRadius: '8px',
+                          padding: '8px 12px', borderRadius: '8px',
                           color: pathname === '/dashboard-management' ? '#a855f7' : 'var(--text-secondary)',
                           background: pathname === '/dashboard-management' ? 'rgba(168,85,247,0.08)' : 'transparent',
                           fontWeight: pathname === '/dashboard-management' ? 600 : 500,
-                          textDecoration: 'none', fontSize: '13px', transition: 'all 0.2s',
+                          textDecoration: 'none', fontSize: '14px', transition: 'all 0.2s',
                         }}
                         onMouseEnter={e => { if (pathname !== '/dashboard-management') e.currentTarget.style.color = 'var(--text-primary)' }}
                         onMouseLeave={e => { if (pathname !== '/dashboard-management') e.currentTarget.style.color = 'var(--text-secondary)' }}
                       >
-                        <SlidersHorizontal size={14} style={{ flexShrink: 0 }} />
+                        <SlidersHorizontal size={16} style={{ flexShrink: 0 }} />
                         <span>Management</span>
                       </Link>
 
@@ -220,11 +221,11 @@ const Sidebar = memo(() => {
                         to={`/dashboards/${p.id}`}
                         style={{
                           display: 'flex', alignItems: 'center', gap: '10px',
-                          padding: '7px 12px', borderRadius: '8px',
+                          padding: '8px 12px', borderRadius: '8px',
                           color: isActive ? '#14b8a6' : 'var(--text-secondary)',
                           background: isActive ? 'rgba(20,184,166,0.08)' : 'transparent',
                           fontWeight: isActive ? 600 : 500,
-                          textDecoration: 'none', fontSize: '13px',
+                          textDecoration: 'none', fontSize: '14px',
                           transition: 'all 0.2s',
                           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         }}
@@ -232,7 +233,7 @@ const Sidebar = memo(() => {
                         onMouseEnter={e => { if (!isActive) e.currentTarget.style.color = 'var(--text-primary)' }}
                         onMouseLeave={e => { if (!isActive) e.currentTarget.style.color = 'var(--text-secondary)' }}
                       >
-                        <LayoutDashboard size={14} style={{ flexShrink: 0 }} />
+                        <LayoutDashboard size={16} style={{ flexShrink: 0 }} />
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
                         {!p.isVisible && isAdmin && (
                           <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warning)', background: 'var(--warning-muted)', padding: '1px 5px', borderRadius: 4, flexShrink: 0 }}>HIDDEN</span>
@@ -279,7 +280,10 @@ const Sidebar = memo(() => {
                 </div>
                 {isOpen && sidebarOpen && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginLeft: 34 }}>
-                    {item.subItems.map(sub => {
+                    {item.subItems.map((sub, idx) => {
+                      if (sub.divider) {
+                        return <div key={`div-${idx}`} style={{ height: 1, background: 'var(--border)', margin: '4px 8px 4px 0', opacity: 0.3 }} />
+                      }
                       const isActive = pathname === sub.path
                       const SubIcon = sub.icon
                       return (

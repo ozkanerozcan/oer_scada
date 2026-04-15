@@ -1,14 +1,6 @@
 import PropTypes from 'prop-types'
 import useTagStore from '@/stores/tagStore'
-
-// Multipliers for the fontSize config setting
-// Base value font = N cqw, title and unit scale relative to that
-const SIZE_MULTIPLIERS = {
-  small:  { value: 14, unit: 5,  title: 4.5 },
-  medium: { value: 18, unit: 6,  title: 5   },
-  large:  { value: 22, unit: 7,  title: 5.5 },
-  xl:     { value: 28, unit: 8.5, title: 6  },
-}
+import useWatchStore from '@/stores/watchStore'
 
 export default function ValueCard({ config = {}, isPreview = false }) {
   const {
@@ -17,10 +9,14 @@ export default function ValueCard({ config = {}, isPreview = false }) {
     value       = '2369',
     showUnit    = true,
     unit        = 'pcs',
-    fontSize    = 'large',
     accentColor = '#3b82f6',
     tagKey      = '',
   } = config
+
+  // Look up the dataType for this tag from the already-loaded watch list
+  const dataType = useWatchStore(s =>
+    tagKey ? (s.items.find(w => w.tagKey === tagKey)?.dataType ?? '') : ''
+  )
 
   // Live tag binding: if tagKey is set, read from the global tag value store
   const liveEntry = useTagStore(s => tagKey ? s.values[tagKey] : null)
@@ -28,17 +24,19 @@ export default function ValueCard({ config = {}, isPreview = false }) {
     if (!tagKey || liveEntry === null || liveEntry === undefined) return value
     const raw = liveEntry.value
     if (typeof raw === 'number') {
-      // Format floats to at most 4 significant digits to avoid noise
-      return Number.isInteger(raw) ? String(raw) : parseFloat(raw.toPrecision(4)).toString()
+      if (Number.isInteger(raw)) return String(raw)
+      // Float32 → max 2 decimal places, strip trailing zeros
+      if ((dataType || '').toLowerCase() === 'float32') {
+        return parseFloat(raw.toFixed(2)).toString()
+      }
+      // All other floats → up to 4 significant digits
+      return parseFloat(raw.toPrecision(4)).toString()
     }
     if (raw === null || raw === undefined) return value
     return String(raw)
   })()
 
-  const m = SIZE_MULTIPLIERS[fontSize] || SIZE_MULTIPLIERS.large
-
   if (isPreview) {
-    // Preview thumbnails keep fixed px sizes
     return (
       <div style={{
         width: '100%', height: '100%',
@@ -67,6 +65,10 @@ export default function ValueCard({ config = {}, isPreview = false }) {
       position: 'relative',
       overflow: 'hidden',
     }}>
+      {/*
+        No clamp() max cap — font scales with cqw/cqh indefinitely.
+        Uses min() of two axes so the value never overflows in either direction.
+      */}
       <style>{`
         @container valuecard (min-width: 1px) {
           .vc-root {
@@ -76,32 +78,32 @@ export default function ValueCard({ config = {}, isPreview = false }) {
             align-items: center;
             width: 100%;
             height: 100%;
-            padding: clamp(8px, 3cqw, 28px);
-            gap: clamp(2px, 1.2cqh, 10px);
+            padding: max(6px, 3cqw);
+            gap: max(2px, 1.2cqh);
             box-sizing: border-box;
           }
           .vc-title {
-            font-size: clamp(8px, ${m.title}cqw, 48px);
+            font-size: max(8px, min(4.5cqw, 5cqh));
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: var(--text-muted);
             text-align: center;
-            margin-bottom: clamp(1px, 0.5cqh, 6px);
+            margin-bottom: max(1px, 0.5cqh);
+            flex-shrink: 0;
           }
           .vc-value {
             font-family: 'JetBrains Mono', monospace;
-            font-size: clamp(14px, ${m.value}cqw, 180px);
+            font-size: max(14px, min(22cqw, 38cqh));
             font-weight: 900;
             letter-spacing: -0.03em;
             line-height: 1;
             transition: color 0.3s;
           }
           .vc-unit {
-            font-size: clamp(8px, ${m.unit}cqw, 80px);
+            font-size: max(8px, min(7cqw, 12cqh));
             font-weight: 600;
             color: var(--text-muted);
-            margin-bottom: clamp(1px, 0.4cqh, 6px);
             line-height: 1;
           }
         }

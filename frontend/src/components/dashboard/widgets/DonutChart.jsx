@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types'
+import useTagStore from '@/stores/tagStore'
 
 function polarToCartesian(cx, cy, r, angleDeg) {
   const rad = ((angleDeg - 90) * Math.PI) / 180
@@ -15,14 +16,16 @@ function describeArc(cx, cy, r, startAngle, endAngle) {
 // ── Preview (thumbnail) — fixed small size ───────────────────────
 function DonutPreview({ config }) {
   const {
-    value = 65, maxValue = 100, unit = '%',
+    value = 65, minValue = 0, maxValue = 100, unit = '%',
     angle = 270, color = '#14b8a6',
     showTitle = true, title = 'Donut Chart',
     showCenterLabel = true, showPercentage = false,
   } = config
 
-  const safeMax = maxValue > 0 ? maxValue : 100
-  const pct = Math.min(Math.max(value / safeMax, 0), 1)
+  const safeRange = maxValue - minValue
+  const pct = safeRange > 0
+    ? Math.min(Math.max((value - minValue) / safeRange, 0), 1)
+    : 0
   const is360 = angle === 360
   const startAngle = is360 ? 0 : -135
   const fgEnd = is360
@@ -51,13 +54,32 @@ function DonutPreview({ config }) {
   )
 }
 
+// ── Resolve a numeric value from tag store or fall back to a static value ──
+function useResolvedNumber(tagKey, staticVal, fallback = 0) {
+  const liveEntry = useTagStore(s => tagKey ? s.values[tagKey] : null)
+  if (!tagKey || liveEntry === null || liveEntry === undefined) {
+    const n = Number(staticVal)
+    return Number.isFinite(n) ? n : fallback
+  }
+  const raw = liveEntry.value
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : fallback
+}
+
 // ── Main widget — scales with card ──────────────────────────────
 export default function DonutChart({ config = {}, isPreview = false }) {
   const {
     title           = 'Donut Chart',
     showTitle       = true,
+    // Current value
+    tagKey          = '',
     value           = 65,
+    // Min / Max
+    minValue        = 0,
+    minTagKey       = '',
     maxValue        = 100,
+    maxTagKey       = '',
+    //
     unit            = '%',
     angle           = 270,
     color           = '#14b8a6',
@@ -65,10 +87,25 @@ export default function DonutChart({ config = {}, isPreview = false }) {
     showPercentage  = false,
   } = config
 
-  if (isPreview) return <DonutPreview config={config} />
+  // Resolve all three numeric values from either live tags or static config
+  const resolvedValue = useResolvedNumber(tagKey,    value,    65)
+  const resolvedMin   = useResolvedNumber(minTagKey, minValue,  0)
+  const resolvedMax   = useResolvedNumber(maxTagKey, maxValue, 100)
 
-  const safeMax = maxValue > 0 ? maxValue : 100
-  const pct = Math.min(Math.max(value / safeMax, 0), 1)
+  if (isPreview) {
+    // Pass already-resolved values into the pure preview component
+    return <DonutPreview config={{
+      ...config,
+      value:    resolvedValue,
+      minValue: resolvedMin,
+      maxValue: resolvedMax,
+    }} />
+  }
+
+  const safeRange = resolvedMax - resolvedMin
+  const pct = safeRange > 0
+    ? Math.min(Math.max((resolvedValue - resolvedMin) / safeRange, 0), 1)
+    : 0
 
   const is360 = angle === 360
   const startAngle = is360 ? 0 : -135
@@ -87,7 +124,12 @@ export default function DonutChart({ config = {}, isPreview = false }) {
   const bgPath = describeArc(cx, cy, r, is360 ? 0.001 : startAngle, is360 ? 359.999 : startAngle + totalSweep)
   const fgPath = pct > 0 ? describeArc(cx, cy, r, startAngle, fgEnd) : null
 
-  const displayValue = showPercentage ? `${Math.round(pct * 100)}%` : value
+  // When percentage is on, show computed %; otherwise show raw resolved value
+  const displayValue = showPercentage
+    ? `${Math.round(pct * 100)}%`
+    : (Number.isInteger(resolvedValue)
+        ? resolvedValue
+        : parseFloat(resolvedValue.toPrecision(5)))
 
   // Center text sizes in viewBox units (they scale with SVG)
   const centerFontSize = 32

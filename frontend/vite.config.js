@@ -11,8 +11,8 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['favicon.ico', 'icons.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'OER SCADA',
-        short_name: 'OER SCADA',
+        name: 'OE Technology',
+        short_name: 'OE Technology',
         description: 'SCADA HMI — Endüstriyel İzleme ve Kontrol Sistemi',
         theme_color: '#ffffff',
         background_color: '#ffffff',
