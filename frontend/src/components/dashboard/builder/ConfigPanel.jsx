@@ -525,6 +525,14 @@ function LineChartConfig({ config, update }) {
   )
 }
 
+const FONT_FAMILIES = [
+  { value: 'Inter',       label: 'Inter — UI Standard' },
+  { value: 'Rajdhani',    label: 'Rajdhani — Industrial / SCADA' },
+  { value: 'Roboto Mono', label: 'Roboto Mono — Numeric / Data' },
+  { value: 'Orbitron',    label: 'Orbitron — Futuristic / HMI' },
+  { value: 'IBM Plex Sans', label: 'IBM Plex Sans — Professional' },
+]
+
 function TextWidgetConfig({ config, update }) {
   return (
     <>
@@ -552,26 +560,59 @@ function TextWidgetConfig({ config, update }) {
           onBlur={e => e.target.style.borderColor = 'var(--border)'}
         />
       </Row>
-      <Row label="Font Size">
-        <SelectInput value={config.fontSize} onChange={v => update({ fontSize: v })} options={[
-          { value: 'small',  label: 'Small (12px)' },
-          { value: 'medium', label: 'Medium (14px)' },
-          { value: 'large',  label: 'Large (18px)' },
-          { value: 'xl',     label: 'Extra Large (24px)' },
-        ]} />
+
+      {/* Font Family */}
+      <Row label="Font Family">
+        <SelectInput
+          value={config.fontFamily || 'Inter'}
+          onChange={v => update({ fontFamily: v })}
+          options={FONT_FAMILIES}
+        />
       </Row>
+
+      {/* Font Size — preset OR custom px */}
+      <Row label="Font Size">
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <SelectInput
+            value={config.fontSizePreset || 'medium'}
+            onChange={v => update({ fontSizePreset: v, fontSizePx: null })}
+            options={[
+              { value: 'custom', label: 'Custom px…' },
+              { value: 'small',  label: 'Small (12px)' },
+              { value: 'medium', label: 'Medium (14px)' },
+              { value: 'large',  label: 'Large (18px)' },
+              { value: 'xl',     label: 'XL (24px)' },
+              { value: 'xxl',    label: 'XXL (32px)' },
+              { value: 'xxxl',   label: 'XXXL (48px)' },
+            ]}
+          />
+          {(config.fontSizePreset === 'custom' || config.fontSizePx != null) && (
+            <input
+              type="number"
+              className="input"
+              value={config.fontSizePx ?? 14}
+              min={8} max={200}
+              onChange={e => update({ fontSizePx: Number(e.target.value), fontSizePreset: 'custom' })}
+              style={{ fontSize: 12, padding: '7px 8px', width: 70, flexShrink: 0 }}
+            />
+          )}
+        </div>
+      </Row>
+
       <Row label="Font Weight">
         <SelectInput value={config.fontWeight} onChange={v => update({ fontWeight: v })} options={[
-          { value: 'normal',   label: 'Normal' },
-          { value: 'semibold', label: 'Semi Bold' },
-          { value: 'bold',     label: 'Bold' },
+          { value: 'normal',   label: 'Normal (400)' },
+          { value: 'semibold', label: 'Semi Bold (600)' },
+          { value: 'bold',     label: 'Bold (700)' },
+          { value: 'extrabold', label: 'Extra Bold (800)' },
         ]} />
       </Row>
       <Row label="Alignment">
         <SelectInput value={config.align} onChange={v => update({ align: v })} options={[
-          { value: 'left',   label: 'Left' },
-          { value: 'center', label: 'Center' },
-          { value: 'right',  label: 'Right' },
+          { value: 'left',    label: 'Left' },
+          { value: 'center',  label: 'Center' },
+          { value: 'right',   label: 'Right' },
+          { value: 'justify', label: 'Justify' },
         ]} />
       </Row>
       <Row label="Text Color">
@@ -579,6 +620,26 @@ function TextWidgetConfig({ config, update }) {
       </Row>
       <Row label="Italic">
         <Toggle value={config.italic} onChange={v => update({ italic: v })} label={config.italic ? 'On' : 'Off'} />
+      </Row>
+      <Row label="Underline">
+        <Toggle value={config.underline} onChange={v => update({ underline: v })} label={config.underline ? 'On' : 'Off'} />
+      </Row>
+      <Row label="Letter Spacing">
+        <SelectInput value={config.letterSpacing || 'normal'} onChange={v => update({ letterSpacing: v })} options={[
+          { value: 'normal',  label: 'Normal' },
+          { value: 'tight',   label: 'Tight' },
+          { value: 'wide',    label: 'Wide' },
+          { value: 'widest',  label: 'Widest' },
+        ]} />
+      </Row>
+      <Row label="Line Height">
+        <SelectInput value={config.lineHeight || '1.6'} onChange={v => update({ lineHeight: v })} options={[
+          { value: '1',    label: 'Single (1.0)' },
+          { value: '1.25', label: 'Compact (1.25)' },
+          { value: '1.6',  label: 'Normal (1.6)' },
+          { value: '2',    label: 'Relaxed (2.0)' },
+          { value: '2.5',  label: 'Double (2.5)' },
+        ]} />
       </Row>
       <Row label="Background Color">
         <ColorInput value={config.bgColor || '#1a2235'} onChange={v => update({ bgColor: v })} />
@@ -609,22 +670,18 @@ export default function ConfigPanel({ widgetId, onClose }) {
 
   return (
     <div style={{
-      position: 'absolute',
-      right: 260,
-      top: 0,
-      bottom: 0,
       width: 280,
+      flexShrink: 0,
+      height: '100%',
       background: 'var(--bg-secondary)',
-      borderLeft: '1px solid var(--border)',
+      borderRight: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
-      zIndex: 50,
-      boxShadow: '-8px 0 32px rgba(0,0,0,0.2)',
-      animation: 'slideInRight 0.2s ease-out',
+      animation: 'slideInFromLeft 0.2s ease-out',
     }}>
       <style>{`
-        @keyframes slideInRight {
-          from { opacity: 0; transform: translateX(20px); }
+        @keyframes slideInFromLeft {
+          from { opacity: 0; transform: translateX(-20px); }
           to   { opacity: 1; transform: translateX(0); }
         }
       `}</style>

@@ -84,8 +84,6 @@ function DashboardBuilderInner() {
   }, [])
 
   // ── Keyboard shortcuts (ref-based: listener registered ONCE) ──
-  // Keep mutable values in refs so the single listener always reads the
-  // current value without needing to re-register.
   const selectedIdRef = useRef(null)
   const isEditingRef  = useRef(true)
   const flashRef      = useRef(flash)
@@ -97,7 +95,6 @@ function DashboardBuilderInner() {
     const onKeyDown = (e) => {
       if (!isEditingRef.current) return
 
-      // Suppress when focus is inside any form control
       const tag = (document.activeElement?.tagName ?? '').toUpperCase()
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       if (document.activeElement?.isContentEditable) return
@@ -106,7 +103,6 @@ function DashboardBuilderInner() {
       const id    = selectedIdRef.current
       const key   = e.key.toLowerCase()
 
-      // Ctrl / Cmd + C — copy
       if ((e.ctrlKey || e.metaKey) && key === 'c') {
         if (!id) return
         const src = store.widgets.find(w => w.id === id)
@@ -117,7 +113,6 @@ function DashboardBuilderInner() {
         return
       }
 
-      // Ctrl / Cmd + V — paste
       if ((e.ctrlKey || e.metaKey) && key === 'v') {
         if (!clipboardRef.current) return
         e.preventDefault()
@@ -134,7 +129,6 @@ function DashboardBuilderInner() {
         return
       }
 
-      // Delete — remove selected widget
       if (e.key === 'Delete' && id) {
         e.preventDefault()
         store.removeWidget(id)
@@ -145,7 +139,7 @@ function DashboardBuilderInner() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, []) // ← empty: registers once on mount, reads live values via refs
+  }, [])
 
   const hasCopied = !!clipboardRef.current
 
@@ -327,20 +321,31 @@ function DashboardBuilderInner() {
           from { opacity: 0; transform: scale(0.9); }
           to   { opacity: 1; transform: scale(1); }
         }
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(20px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
       `}</style>
 
       {/* ── Main area ─────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0, position: 'relative' }}>
+      {/* Layout: [ConfigPanel?] [Canvas] [ComponentLibrary?]
+          ConfigPanel and ComponentLibrary sit in normal flex flow so they
+          don't overlay the canvas — the canvas simply shrinks to fill the rest. */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+
+        {/* Config panel — left of canvas, in flow (not absolute overlay) */}
+        {selectedId && isEditing && (
+          <ConfigPanel widgetId={selectedId} onClose={handleDeselect} />
+        )}
+
+        {/* Canvas — takes all remaining space */}
         <WidgetCanvas
           selectedId={selectedId}
           onSelect={handleSelect}
           isEditing={isEditing}
         />
 
-        {selectedId && isEditing && (
-          <ConfigPanel widgetId={selectedId} onClose={handleDeselect} />
-        )}
-
+        {/* Component library — rightmost panel */}
         {isEditing && <ComponentLibrary />}
       </div>
     </div>

@@ -78,18 +78,18 @@ export default function ValueCard({ config = {}, isPreview = false }) {
             align-items: center;
             width: 100%;
             height: 100%;
-            padding: max(6px, 3cqw);
-            gap: max(2px, 1.2cqh);
+            padding: max(4px, 2cqw);
+            gap: max(1px, 0.8cqh);
             box-sizing: border-box;
           }
           .vc-title {
-            font-size: max(8px, min(4.5cqw, 5cqh));
+            font-size: max(10px, min(9cqw, 11cqh));
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.08em;
             color: var(--text-muted);
             text-align: center;
-            margin-bottom: max(1px, 0.5cqh);
+            margin-bottom: max(1px, 0.4cqh);
             flex-shrink: 0;
           }
           .vc-value {

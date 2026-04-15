@@ -4,7 +4,7 @@ import useDashboardStore from '@/pages/DashboardBuilder/useDashboardStore'
 import WidgetWrapper from './WidgetWrapper'
 
 const COLS    = 12
-const CELL_H  = 80
+const CELL_H  = 30
 
 // Draw a crosshatch/grid overlay on the canvas
 function GridOverlay({ cellW, cellH, cols, rows }) {
