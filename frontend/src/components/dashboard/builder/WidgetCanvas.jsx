@@ -3,8 +3,7 @@ import PropTypes from 'prop-types'
 import useDashboardStore from '@/pages/DashboardBuilder/useDashboardStore'
 import WidgetWrapper from './WidgetWrapper'
 
-const COLS    = 12
-const CELL_H  = 30
+const COLS = 24
 
 // Draw a crosshatch/grid overlay on the canvas
 function GridOverlay({ cellW, cellH, cols, rows }) {
@@ -44,7 +43,7 @@ function GridOverlay({ cellW, cellH, cols, rows }) {
   )
 }
 
-export default function WidgetCanvas({ selectedId, onSelect, isEditing }) {
+export default function WidgetCanvas({ selectedId, onSelect, onOpenConfig, isEditing }) {
   const widgets   = useDashboardStore(s => s.widgets)
   const addWidget = useDashboardStore(s => s.addWidget)
   const bringToFront = useDashboardStore(s => s.bringToFront)
@@ -52,6 +51,9 @@ export default function WidgetCanvas({ selectedId, onSelect, isEditing }) {
   const containerRef = useRef(null)
   const [cellW, setCellW]   = useState(100)
   const [canvasH, setCanvasH] = useState(0)
+
+  // Link cell height directly to cell width for perfectly square grid
+  const cellH = cellW
 
   // Measure container width → derive cellW
   useEffect(() => {
@@ -65,7 +67,7 @@ export default function WidgetCanvas({ selectedId, onSelect, isEditing }) {
     return () => obs.disconnect()
   }, [])
 
-  const rows = Math.max(10, Math.ceil(canvasH / CELL_H) + 2)
+  const rows = Math.max(10, Math.ceil(canvasH / cellH) + 2)
 
   // ── Drop handler ───────────────────────────────────────────────
   const handleDrop = useCallback((e) => {
@@ -74,11 +76,11 @@ export default function WidgetCanvas({ selectedId, onSelect, isEditing }) {
     if (!type) return
     const rect = containerRef.current.getBoundingClientRect()
     const col  = Math.floor((e.clientX - rect.left) / cellW)
-    const row  = Math.floor((e.clientY - rect.top)  / CELL_H)
+    const row  = Math.floor((e.clientY - rect.top)  / cellH)
     const safeCol = Math.max(0, Math.min(col, COLS - 1))
     const safeRow = Math.max(0, row)
     addWidget(type, safeCol, safeRow)
-  }, [addWidget, cellW])
+  }, [addWidget, cellW, cellH])
 
   const handleDragOver = useCallback((e) => {
     e.preventDefault()
@@ -112,11 +114,11 @@ export default function WidgetCanvas({ selectedId, onSelect, isEditing }) {
       <div style={{
         position: 'relative',
         width: '100%',
-        minHeight: rows * CELL_H,
+        minHeight: rows * cellH,
       }}>
         {/* Grid overlay when editing */}
         {isEditing && (
-          <GridOverlay cellW={cellW} cellH={CELL_H} cols={COLS} rows={rows} />
+          <GridOverlay cellW={cellW} cellH={cellH} cols={COLS} rows={rows} />
         )}
 
         {/* Empty state */}
@@ -162,8 +164,9 @@ export default function WidgetCanvas({ selectedId, onSelect, isEditing }) {
             widget={w}
             isSelected={selectedId === w.id}
             onSelect={handleSelect}
+            onOpenConfig={onOpenConfig}
             cellW={cellW}
-            cellH={CELL_H}
+            cellH={cellH}
             isEditing={isEditing}
           />
         ))}
@@ -175,6 +178,7 @@ export default function WidgetCanvas({ selectedId, onSelect, isEditing }) {
 WidgetCanvas.propTypes = {
   selectedId: PropTypes.string,
   onSelect:   PropTypes.func.isRequired,
+  onOpenConfig: PropTypes.func,
   isEditing:  PropTypes.bool,
 }
 

@@ -35,22 +35,23 @@ function DashboardBuilderInner() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [selectedId, setSelectedId] = useState(null)
-  const [isEditing,  setIsEditing]  = useState(true)
-  const [flashMsg,   setFlashMsg]   = useState(null) // 'copied' | 'pasted' | 'deleted'
+  const [configPanelId, setConfigPanelId] = useState(null)
+  const [isEditing, setIsEditing] = useState(true)
+  const [flashMsg, setFlashMsg] = useState(null) // 'copied' | 'pasted' | 'deleted'
 
   const clipboardRef = useRef(null) // stores a deep-copy of the widget being copied
 
-  const widgets         = useDashboardStore(s => s.widgets)
-  const currentPageId   = useDashboardStore(s => s.currentPageId)
-  const clearCanvas     = useDashboardStore(s => s.clearCanvas)
-  const loadWidgets     = useDashboardStore(s => s.loadWidgets)
-  const removeWidget    = useDashboardStore(s => s.removeWidget)
+  const widgets = useDashboardStore(s => s.widgets)
+  const currentPageId = useDashboardStore(s => s.currentPageId)
+  const clearCanvas = useDashboardStore(s => s.clearCanvas)
+  const loadWidgets = useDashboardStore(s => s.loadWidgets)
+  const removeWidget = useDashboardStore(s => s.removeWidget)
   const duplicateWidget = useDashboardStore(s => s.duplicateWidget)
-  const addWidgetRaw    = useDashboardStore(s => s.addWidget)
+  const addWidgetRaw = useDashboardStore(s => s.addWidget)
 
   const updatePageWidgets = useDashboardPagesStore(s => s.updatePageWidgets)
-  const getPage           = useDashboardPagesStore(s => s.getPage)
-  const setCurrentPageId  = useDashboardStore(s => s.setCurrentPageId)
+  const getPage = useDashboardPagesStore(s => s.getPage)
+  const setCurrentPageId = useDashboardStore(s => s.setCurrentPageId)
 
   const currentPage = currentPageId ? getPage(currentPageId) : null
 
@@ -67,8 +68,17 @@ function DashboardBuilderInner() {
     }
   }, [id, getPage, loadWidgets, navigate, currentPageId])
 
-  const handleSelect   = useCallback(id => setSelectedId(id), [])
-  const handleDeselect = useCallback(() => setSelectedId(null), [])
+  const handleSelect = useCallback(id => {
+    setSelectedId(id)
+    setConfigPanelId(prev => {
+      if (!id) return null
+      return prev ? id : null
+    })
+  }, [])
+  const handleDeselect = useCallback(() => {
+    setSelectedId(null)
+    setConfigPanelId(null)
+  }, [])
 
   const handleUpdate = () => {
     if (!currentPageId) return
@@ -85,11 +95,11 @@ function DashboardBuilderInner() {
 
   // ── Keyboard shortcuts (ref-based: listener registered ONCE) ──
   const selectedIdRef = useRef(null)
-  const isEditingRef  = useRef(true)
-  const flashRef      = useRef(flash)
+  const isEditingRef = useRef(true)
+  const flashRef = useRef(flash)
   useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
-  useEffect(() => { isEditingRef.current  = isEditing  }, [isEditing])
-  useEffect(() => { flashRef.current      = flash      }, [flash])
+  useEffect(() => { isEditingRef.current = isEditing }, [isEditing])
+  useEffect(() => { flashRef.current = flash }, [flash])
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -100,8 +110,8 @@ function DashboardBuilderInner() {
       if (document.activeElement?.isContentEditable) return
 
       const store = useDashboardStore.getState()
-      const id    = selectedIdRef.current
-      const key   = e.key.toLowerCase()
+      const id = selectedIdRef.current
+      const key = e.key.toLowerCase()
 
       if ((e.ctrlKey || e.metaKey) && key === 'c') {
         if (!id) return
@@ -133,6 +143,7 @@ function DashboardBuilderInner() {
         e.preventDefault()
         store.removeWidget(id)
         setSelectedId(null)
+        setConfigPanelId(null)
         flashRef.current('deleted')
       }
     }
@@ -222,7 +233,7 @@ function DashboardBuilderInner() {
         {/* Clear */}
         {isEditing && (
           <button
-            onClick={() => { clearCanvas(); setSelectedId(null) }}
+            onClick={() => { clearCanvas(); setSelectedId(null); setConfigPanelId(null) }}
             disabled={widgets.length === 0}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
@@ -232,7 +243,7 @@ function DashboardBuilderInner() {
               cursor: 'pointer', fontFamily: 'inherit',
               opacity: widgets.length === 0 ? 0.4 : 1,
             }}
-            onMouseEnter={e => { if (widgets.length > 0) { e.currentTarget.style.borderColor = 'var(--danger)'; e.currentTarget.style.color = 'var(--danger)' }}}
+            onMouseEnter={e => { if (widgets.length > 0) { e.currentTarget.style.borderColor = 'var(--danger)'; e.currentTarget.style.color = 'var(--danger)' } }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
           >
             <Trash2 size={14} />
@@ -281,14 +292,14 @@ function DashboardBuilderInner() {
           borderRadius: 10, padding: 3, gap: 2,
         }}>
           <button
-            onClick={() => { setIsEditing(true); setSelectedId(null) }}
+            onClick={() => { setIsEditing(true); setSelectedId(null); setConfigPanelId(null) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 5,
               padding: '5px 12px', borderRadius: 7,
               border: 'none', cursor: 'pointer', fontFamily: 'inherit',
               fontSize: 12, fontWeight: 700,
-              background: isEditing  ? 'var(--accent)' : 'transparent',
-              color:      isEditing  ? '#fff'          : 'var(--text-muted)',
+              background: isEditing ? 'var(--accent)' : 'transparent',
+              color: isEditing ? '#fff' : 'var(--text-muted)',
               transition: 'all 0.18s',
               boxShadow: isEditing ? '0 1px 6px rgba(59,130,246,0.35)' : 'none',
             }}
@@ -304,7 +315,7 @@ function DashboardBuilderInner() {
               border: 'none', cursor: 'pointer', fontFamily: 'inherit',
               fontSize: 12, fontWeight: 700,
               background: !isEditing ? 'var(--success)' : 'transparent',
-              color:      !isEditing ? '#fff'           : 'var(--text-muted)',
+              color: !isEditing ? '#fff' : 'var(--text-muted)',
               transition: 'all 0.18s',
               boxShadow: !isEditing ? '0 1px 6px rgba(34,197,94,0.35)' : 'none',
             }}
@@ -334,14 +345,15 @@ function DashboardBuilderInner() {
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
 
         {/* Config panel — left of canvas, in flow (not absolute overlay) */}
-        {selectedId && isEditing && (
-          <ConfigPanel widgetId={selectedId} onClose={handleDeselect} />
+        {configPanelId && isEditing && (
+          <ConfigPanel widgetId={configPanelId} onClose={() => setConfigPanelId(null)} />
         )}
 
         {/* Canvas — takes all remaining space */}
         <WidgetCanvas
           selectedId={selectedId}
           onSelect={handleSelect}
+          onOpenConfig={(id) => setConfigPanelId(id)}
           isEditing={isEditing}
         />
 

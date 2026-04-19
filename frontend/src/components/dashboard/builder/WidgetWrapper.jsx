@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react'
 import PropTypes from 'prop-types'
-import { Copy, Trash2 } from 'lucide-react'
+import { Copy, Trash2, Settings } from 'lucide-react'
 import ValueCard from '../widgets/ValueCard'
 import LEDIndicator from '../widgets/LEDIndicator'
 import DonutChart from '../widgets/DonutChart'
@@ -31,6 +31,7 @@ export default function WidgetWrapper({
   widget,
   isSelected,
   onSelect,
+  onOpenConfig,
   cellW,
   cellH,
   isEditing,
@@ -203,6 +204,33 @@ export default function WidgetWrapper({
             {widget.type.replace(/([A-Z])/g, ' $1').trim()}
           </div>
 
+          {/* Configure button */}
+          <button
+            title="Configure widget"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (onOpenConfig) onOpenConfig(widget.id)
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '3px 10px',
+              background: 'rgba(59,130,246,0.85)',
+              color: '#fff',
+              border: 'none',
+              borderLeft: '1px solid rgba(255,255,255,0.15)',
+              fontSize: 10, fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              backdropFilter: 'blur(4px)',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,1)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(59,130,246,0.85)'}
+          >
+            <Settings size={11} />
+            Configure
+          </button>
+
           {/* Duplicate button */}
           <button
             title="Duplicate widget"
@@ -269,6 +297,7 @@ WidgetWrapper.propTypes = {
   widget:    PropTypes.object.isRequired,
   isSelected: PropTypes.bool,
   onSelect:   PropTypes.func.isRequired,
+  onOpenConfig: PropTypes.func,
   cellW:      PropTypes.number.isRequired,
   cellH:      PropTypes.number.isRequired,
   isEditing:  PropTypes.bool,

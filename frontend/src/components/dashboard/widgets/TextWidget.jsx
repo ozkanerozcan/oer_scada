@@ -63,24 +63,26 @@ export default function TextWidget({ config = {}, isPreview = false }) {
     lineHeight      = '1.6',
   } = config
 
-  // Resolve font size: custom px > preset > legacy
+  // Resolve font size: custom px > legacy preset
   const resolvedFontSize = isPreview
     ? 10
-    : fontSizePx != null && fontSizePreset === 'custom'
+    : fontSizePx != null
       ? fontSizePx
       : FONT_SIZE_PRESET_MAP[fontSizePreset] ?? FONT_SIZE_PRESET_MAP[fontSize] ?? 14
 
-  const resolvedFontWeight = FONT_WEIGHT_MAP[fontWeight] ?? 400
+  const resolvedFontWeight = FONT_WEIGHT_MAP[fontWeight] ?? (fontWeight === 'bold' || fontWeight === 'extrabold' ? 700 : 400)
   const resolvedLetterSpacing = LETTER_SPACING_MAP[letterSpacing] ?? '0em'
 
   return (
     <div style={{
       width: '100%',
       height: '100%',
+      containerType: 'size',
+      containerName: 'textcard',
       display: 'flex',
       alignItems: 'center',
       justifyContent: ALIGN_MAP[align] || 'flex-start',
-      padding: isPreview ? '6px 8px' : '14px 18px',
+      padding: isPreview ? '6px 8px' : (config.paddingPx != null && config.paddingPx !== '' ? `${config.paddingPx}px` : 'max(2px, 1cqw)'),
       background: bgColor || 'transparent',
       borderRadius: 10,
       border: showBorder ? '1px solid var(--border-light)' : '1px solid transparent',

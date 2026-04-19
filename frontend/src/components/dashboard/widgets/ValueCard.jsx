@@ -11,6 +11,9 @@ export default function ValueCard({ config = {}, isPreview = false }) {
     unit        = 'pcs',
     accentColor = '#3b82f6',
     tagKey      = '',
+    // Title rich text config
+    titleFontFamily, titleFontSizePx, titleFontWeight, titleColor,
+    titleAlign, titleItalic, titleUnderline,
   } = config
 
   // Look up the dataType for this tag from the already-loaded watch list
@@ -78,11 +81,12 @@ export default function ValueCard({ config = {}, isPreview = false }) {
             align-items: center;
             width: 100%;
             height: 100%;
-            padding: max(4px, 2cqw);
+            padding: ${config.paddingPx != null && config.paddingPx !== '' ? `${config.paddingPx}px` : 'max(2px, 1cqw)'};
             gap: max(1px, 0.8cqh);
             box-sizing: border-box;
           }
           .vc-title {
+            width: 100%;
             font-size: max(10px, min(9cqw, 11cqh));
             font-weight: 700;
             text-transform: uppercase;
@@ -118,7 +122,15 @@ export default function ValueCard({ config = {}, isPreview = false }) {
           opacity: 0.08, filter: 'blur(24px)', pointerEvents: 'none',
         }} />
 
-        {showTitle && <div className="vc-title">{title}</div>}
+        {showTitle && <div className="vc-title" style={{
+          fontFamily: titleFontFamily ? `'${titleFontFamily}', sans-serif` : undefined,
+          fontSize: titleFontSizePx ? `${titleFontSizePx}px` : undefined,
+          fontWeight: titleFontWeight === 'normal' ? 400 : titleFontWeight === 'bold' ? 700 : undefined,
+          color: titleColor || undefined,
+          textAlign: titleAlign || undefined,
+          fontStyle: titleItalic ? 'italic' : undefined,
+          textDecoration: titleUnderline ? 'underline' : undefined,
+        }}>{title}</div>}
 
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3em', lineHeight: 1 }}>
           <span

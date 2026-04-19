@@ -37,6 +37,7 @@ export default function DashboardViewer() {
   // Initialize edit mode based on state from navigation (e.g. from Management page)
   const [isEditing, setIsEditing] = useState(isAdmin ? (location.state?.isEditing || false) : false)
   const [selectedId, setSelectedId] = useState(null)
+  const [configPanelId, setConfigPanelId] = useState(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [saveStatus, setSaveStatus] = useState(null) // 'success' | 'error' | null
 
@@ -66,12 +67,22 @@ export default function DashboardViewer() {
   useEffect(() => {
     setIsEditing(isAdmin ? (location.state?.isEditing || false) : false)
     setSelectedId(null)
+    setConfigPanelId(null)
   }, [id, location.state, isAdmin])
 
   // ── ALL hooks must be declared before any early return ─────────────────────
   // (React Rules of Hooks: never call hooks after a conditional return)
-  const handleSelect   = useCallback(widgetId => setSelectedId(widgetId), [])
-  const handleDeselect = useCallback(() => setSelectedId(null), [])
+  const handleSelect   = useCallback(widgetId => {
+    setSelectedId(widgetId)
+    setConfigPanelId(prev => {
+      if (!widgetId) return null
+      return prev ? widgetId : null
+    })
+  }, [])
+  const handleDeselect = useCallback(() => {
+    setSelectedId(null)
+    setConfigPanelId(null)
+  }, [])
 
   // Non-admins can only see visible pages
   if (!page || (!page.isVisible && !isAdmin)) {
@@ -174,10 +185,10 @@ export default function DashboardViewer() {
 
           {/* Mode toggle */}
           <div style={{ display: 'flex', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 10, padding: 3, gap: 2 }}>
-            <button onClick={() => { setIsEditing(true); setSelectedId(null) }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, background: isEditing ? 'var(--accent)' : 'transparent', color: isEditing ? '#fff' : 'var(--text-muted)', transition: 'all 0.18s', boxShadow: isEditing ? '0 1px 6px rgba(59,130,246,0.35)' : 'none' }}>
+            <button onClick={() => { setIsEditing(true); setSelectedId(null); setConfigPanelId(null) }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, background: isEditing ? 'var(--accent)' : 'transparent', color: isEditing ? '#fff' : 'var(--text-muted)', transition: 'all 0.18s', boxShadow: isEditing ? '0 1px 6px rgba(59,130,246,0.35)' : 'none' }}>
               <Pencil size={13} /> Edit
             </button>
-            <button onClick={() => { setIsEditing(false); setSelectedId(null) }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, background: !isEditing ? 'var(--success)' : 'transparent', color: !isEditing ? '#fff' : 'var(--text-muted)', transition: 'all 0.18s', boxShadow: !isEditing ? '0 1px 6px rgba(34,197,94,0.35)' : 'none' }}>
+            <button onClick={() => { setIsEditing(false); setSelectedId(null); setConfigPanelId(null) }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, background: !isEditing ? 'var(--success)' : 'transparent', color: !isEditing ? '#fff' : 'var(--text-muted)', transition: 'all 0.18s', boxShadow: !isEditing ? '0 1px 6px rgba(34,197,94,0.35)' : 'none' }}>
               <Eye size={13} /> Preview
             </button>
           </div>
@@ -205,12 +216,13 @@ export default function DashboardViewer() {
           <WidgetCanvas
             selectedId={selectedId}
             onSelect={handleSelect}
+            onOpenConfig={(id) => setConfigPanelId(id)}
             isEditing={isEditing && isAdmin}
           />
         )}
 
-        {selectedId && isEditing && isAdmin && (
-          <ConfigPanel widgetId={selectedId} onClose={handleDeselect} />
+        {configPanelId && isEditing && isAdmin && (
+          <ConfigPanel widgetId={configPanelId} onClose={() => setConfigPanelId(null)} />
         )}
 
         {isEditing && isAdmin && <ComponentLibrary />}
@@ -223,6 +235,7 @@ export default function DashboardViewer() {
           onConfirm={() => {
             clearCanvas()
             setSelectedId(null)
+            setConfigPanelId(null)
             setShowClearConfirm(false)
           }}
           onCancel={() => setShowClearConfirm(false)}

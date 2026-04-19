@@ -2,7 +2,7 @@ import PropTypes from 'prop-types'
 import { useEffect } from 'react'
 import useDashboardStore from '@/pages/DashboardBuilder/useDashboardStore'
 import useWatchStore from '@/stores/watchStore'
-import { Trash2, X, Unlink } from 'lucide-react'
+import { Trash2, X, Unlink, AlignLeft, AlignCenter, AlignRight, AlignJustify, Bold, Italic, Underline as UnderlineIcon } from 'lucide-react'
 
 // ── Shared watch-list hook ──────────────────────────────────────
 // Fetches once on first use; subsequent callers get cached data immediately.
@@ -150,6 +150,88 @@ function NumberInput({ value, onChange, min, max }) {
   )
 }
 
+const FONT_FAMILIES = [
+  { value: 'Inter',       label: 'Inter' },
+  { value: 'Rajdhani',    label: 'Rajdhani' },
+  { value: 'Roboto Mono', label: 'Roboto Mono' },
+  { value: 'Orbitron',    label: 'Orbitron' },
+  { value: 'IBM Plex Sans', label: 'IBM Plex' },
+];
+
+function RichTextEditor({ field = 'text', prefix = '', config, update, label = "Text Content" }) {
+  const getK = (k) => prefix ? `${prefix}${k.charAt(0).toUpperCase() + k.slice(1)}` : k;
+  
+  const get = (k) => config[getK(k)];
+  const set = (k, v) => update({ [getK(k)]: v });
+  const toggle = (k) => update({ [getK(k)]: !get(k) });
+
+  const btnStyle = (active) => ({
+    padding: 4, borderRadius: 4, border: 'none',
+    background: active ? 'var(--accent)' : 'transparent',
+    color: active ? '#fff' : 'var(--text-muted)',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'all 0.2s'
+  });
+
+  const selectStyle = {
+    background: 'transparent', border: '1px solid var(--border)', borderRadius: 4,
+    color: 'var(--text-primary)', fontSize: 11, padding: '2px 4px', outline: 'none', cursor: 'pointer'
+  };
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ display: 'block', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 5 }}>
+        {label}
+      </label>
+      
+      <div style={{ background: 'var(--bg-tertiary)', borderRadius: 6, border: '1px solid var(--border)', overflow: 'hidden' }}>
+        
+        {/* Toolbar Row 1: Font Family, Size, Color */}
+        <div style={{ display: 'flex', gap: 4, padding: '4px 6px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', alignItems: 'center' }}>
+          <select value={get('fontFamily') || 'Inter'} onChange={e => set('fontFamily', e.target.value)} style={{ ...selectStyle, flex: 1, minWidth: 70 }}>
+             {FONT_FAMILIES.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+          </select>
+          <input 
+            type="number" placeholder="px" title="Custom Font Size (px). Leave empty for auto."
+            value={get('fontSizePx') ?? ''} 
+            onChange={e => set('fontSizePx', e.target.value ? Number(e.target.value) : null)}
+            style={{ ...selectStyle, width: 45 }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }} title="Text Color">
+             <input type="color" value={get('color') || ''} onChange={e => set('color', e.target.value)} style={{ width: 24, height: 24, padding: 0, border: 'none', cursor: 'pointer', background: 'transparent' }} />
+          </div>
+        </div>
+
+        {/* Toolbar Row 2: Formatting */}
+        <div style={{ display: 'flex', gap: 2, padding: '4px 6px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+          <button title="Bold" style={btnStyle(get('fontWeight') === 'bold' || get('fontWeight') === 'extrabold')} onClick={() => set('fontWeight', get('fontWeight') === 'bold' ? 'normal' : 'bold')}><Bold size={13} /></button>
+          <button title="Italic" style={btnStyle(get('italic'))} onClick={() => toggle('italic')}><Italic size={13} /></button>
+          <button title="Underline" style={btnStyle(get('underline'))} onClick={() => toggle('underline')}><UnderlineIcon size={13} /></button>
+          
+          <div style={{ width: 1, background: 'var(--border)', margin: '0 4px', flexShrink: 0 }} />
+          
+          <button title="Align Left" style={btnStyle(get('align') === 'left' || !get('align'))} onClick={() => set('align', 'left')}><AlignLeft size={13} /></button>
+          <button title="Align Center" style={btnStyle(get('align') === 'center')} onClick={() => set('align', 'center')}><AlignCenter size={13} /></button>
+          <button title="Align Right" style={btnStyle(get('align') === 'right')} onClick={() => set('align', 'right')}><AlignRight size={13} /></button>
+          <button title="Justify" style={btnStyle(get('align') === 'justify')} onClick={() => set('align', 'justify')}><AlignJustify size={13} /></button>
+        </div>
+
+        <textarea
+          value={config[field] ?? ''}
+          onChange={e => update({ [field]: e.target.value })}
+          placeholder="Type here…"
+          rows={3}
+          style={{
+            width: '100%', background: 'transparent', border: 'none', color: 'var(--text-primary)',
+            fontSize: 12, fontFamily: 'inherit', padding: '8px 10px', outline: 'none',
+            resize: 'vertical', lineHeight: 1.6, boxSizing: 'border-box'
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ── Widget-specific config panels ───────────────────────────────
 function ValueCardConfig({ config, update }) {
   const { watchItems, loadingWatch } = useWatchList()
@@ -181,9 +263,7 @@ function ValueCardConfig({ config, update }) {
         <Toggle value={config.showTitle} onChange={v => update({ showTitle: v })} label={config.showTitle ? 'Visible' : 'Hidden'} />
       </Row>
       {config.showTitle && (
-        <Row label="Title Text">
-          <TextInput value={config.title} onChange={v => update({ title: v })} placeholder="Card title" />
-        </Row>
+        <RichTextEditor field="title" prefix="title" config={config} update={update} label="Title Text" />
       )}
       <Row label="Show Unit">
         <Toggle value={config.showUnit} onChange={v => update({ showUnit: v })} label={config.showUnit ? 'Visible' : 'Hidden'} />
@@ -196,6 +276,9 @@ function ValueCardConfig({ config, update }) {
 
       <Row label="Accent Color">
         <ColorInput value={config.accentColor} onChange={v => update({ accentColor: v })} />
+      </Row>
+      <Row label="Padding (px)">
+        <NumberInput value={config.paddingPx} onChange={v => update({ paddingPx: v })} placeholder="Auto" />
       </Row>
     </>
   )
@@ -233,13 +316,11 @@ function LEDConfig({ config, update }) {
         }
       />
 
-      <Row label="Show Label">
-        <Toggle value={config.showLabel} onChange={v => update({ showLabel: v })} label={config.showLabel ? 'Visible' : 'Hidden'} />
+      <Row label="Show Title">
+        <Toggle value={config.showTitle ?? config.showLabel ?? true} onChange={v => update({ showTitle: v })} label={(config.showTitle ?? config.showLabel ?? true) ? 'Visible' : 'Hidden'} />
       </Row>
-      {config.showLabel && (
-        <Row label="Label Text">
-          <TextInput value={config.label} onChange={v => update({ label: v })} placeholder="e.g. Motor Status" />
-        </Row>
+      {(config.showTitle ?? config.showLabel ?? true) && (
+        <RichTextEditor field="title" prefix="title" config={{ ...config, title: config.title ?? config.label ?? 'Status' }} update={update} label="Title Text" />
       )}
       <Row label="ON Color">
         <ColorInput value={config.onColor} onChange={v => update({ onColor: v })} />
@@ -256,6 +337,9 @@ function LEDConfig({ config, update }) {
 
       <Row label="Blink when ON">
         <Toggle value={config.blink} onChange={v => update({ blink: v })} label={config.blink ? 'Enabled' : 'Disabled'} />
+      </Row>
+      <Row label="Padding (px)">
+        <NumberInput value={config.paddingPx} onChange={v => update({ paddingPx: v })} placeholder="Auto" />
       </Row>
     </>
   )
@@ -340,9 +424,7 @@ function DonutConfig({ config, update }) {
         <Toggle value={config.showTitle} onChange={v => update({ showTitle: v })} label={config.showTitle ? 'Visible' : 'Hidden'} />
       </Row>
       {config.showTitle && (
-        <Row label="Title Text">
-          <TextInput value={config.title} onChange={v => update({ title: v })} placeholder="Chart title" />
-        </Row>
+        <RichTextEditor field="title" prefix="title" config={config} update={update} label="Chart Title" />
       )}
 
       {/* ── Current Value ── */}
@@ -424,6 +506,9 @@ function DonutConfig({ config, update }) {
       <Row label="Show as Percentage">
         <Toggle value={config.showPercentage} onChange={v => update({ showPercentage: v })} label={config.showPercentage ? 'Yes — computed from min/max' : 'No — raw value'} />
       </Row>
+      <Row label="Padding (px)">
+        <NumberInput value={config.paddingPx} onChange={v => update({ paddingPx: v })} placeholder="Auto" />
+      </Row>
     </>
   )
 }
@@ -437,9 +522,7 @@ function LineChartConfig({ config, update }) {
         <Toggle value={config.showTitle} onChange={v => update({ showTitle: v })} label={config.showTitle ? 'Visible' : 'Hidden'} />
       </Row>
       {config.showTitle && (
-        <Row label="Title Text">
-          <TextInput value={config.title} onChange={v => update({ title: v })} placeholder="Chart title" />
-        </Row>
+        <RichTextEditor field="title" prefix="title" config={config} update={update} label="Chart Title" />
       )}
 
       {/* ── Current Value (data source) ── */}
@@ -521,128 +604,23 @@ function LineChartConfig({ config, update }) {
       <Row label="Show Dots">
         <Toggle value={config.showDots} onChange={v => update({ showDots: v })} label={config.showDots ? 'Enabled' : 'Disabled'} />
       </Row>
+      <Row label="Padding (px)">
+        <NumberInput value={config.paddingPx} onChange={v => update({ paddingPx: v })} placeholder="Auto" />
+      </Row>
     </>
   )
 }
 
-const FONT_FAMILIES = [
-  { value: 'Inter',       label: 'Inter — UI Standard' },
-  { value: 'Rajdhani',    label: 'Rajdhani — Industrial / SCADA' },
-  { value: 'Roboto Mono', label: 'Roboto Mono — Numeric / Data' },
-  { value: 'Orbitron',    label: 'Orbitron — Futuristic / HMI' },
-  { value: 'IBM Plex Sans', label: 'IBM Plex Sans — Professional' },
-]
-
 function TextWidgetConfig({ config, update }) {
   return (
     <>
-      <Row label="Text Content">
-        <textarea
-          value={config.text ?? ''}
-          onChange={e => update({ text: e.target.value })}
-          placeholder="Type your text here…"
-          rows={4}
-          style={{
-            width: '100%',
-            background: 'var(--bg-tertiary)',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            color: 'var(--text-primary)',
-            fontSize: 12,
-            fontFamily: 'inherit',
-            padding: '8px 10px',
-            outline: 'none',
-            resize: 'vertical',
-            lineHeight: 1.6,
-            transition: 'border-color 0.2s',
-          }}
-          onFocus={e => e.target.style.borderColor = 'var(--accent)'}
-          onBlur={e => e.target.style.borderColor = 'var(--border)'}
-        />
-      </Row>
-
-      {/* Font Family */}
-      <Row label="Font Family">
-        <SelectInput
-          value={config.fontFamily || 'Inter'}
-          onChange={v => update({ fontFamily: v })}
-          options={FONT_FAMILIES}
-        />
-      </Row>
-
-      {/* Font Size — preset OR custom px */}
-      <Row label="Font Size">
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <SelectInput
-            value={config.fontSizePreset || 'medium'}
-            onChange={v => update({ fontSizePreset: v, fontSizePx: null })}
-            options={[
-              { value: 'custom', label: 'Custom px…' },
-              { value: 'small',  label: 'Small (12px)' },
-              { value: 'medium', label: 'Medium (14px)' },
-              { value: 'large',  label: 'Large (18px)' },
-              { value: 'xl',     label: 'XL (24px)' },
-              { value: 'xxl',    label: 'XXL (32px)' },
-              { value: 'xxxl',   label: 'XXXL (48px)' },
-            ]}
-          />
-          {(config.fontSizePreset === 'custom' || config.fontSizePx != null) && (
-            <input
-              type="number"
-              className="input"
-              value={config.fontSizePx ?? 14}
-              min={8} max={200}
-              onChange={e => update({ fontSizePx: Number(e.target.value), fontSizePreset: 'custom' })}
-              style={{ fontSize: 12, padding: '7px 8px', width: 70, flexShrink: 0 }}
-            />
-          )}
-        </div>
-      </Row>
-
-      <Row label="Font Weight">
-        <SelectInput value={config.fontWeight} onChange={v => update({ fontWeight: v })} options={[
-          { value: 'normal',   label: 'Normal (400)' },
-          { value: 'semibold', label: 'Semi Bold (600)' },
-          { value: 'bold',     label: 'Bold (700)' },
-          { value: 'extrabold', label: 'Extra Bold (800)' },
-        ]} />
-      </Row>
-      <Row label="Alignment">
-        <SelectInput value={config.align} onChange={v => update({ align: v })} options={[
-          { value: 'left',    label: 'Left' },
-          { value: 'center',  label: 'Center' },
-          { value: 'right',   label: 'Right' },
-          { value: 'justify', label: 'Justify' },
-        ]} />
-      </Row>
-      <Row label="Text Color">
-        <ColorInput value={config.color} onChange={v => update({ color: v })} />
-      </Row>
-      <Row label="Italic">
-        <Toggle value={config.italic} onChange={v => update({ italic: v })} label={config.italic ? 'On' : 'Off'} />
-      </Row>
-      <Row label="Underline">
-        <Toggle value={config.underline} onChange={v => update({ underline: v })} label={config.underline ? 'On' : 'Off'} />
-      </Row>
-      <Row label="Letter Spacing">
-        <SelectInput value={config.letterSpacing || 'normal'} onChange={v => update({ letterSpacing: v })} options={[
-          { value: 'normal',  label: 'Normal' },
-          { value: 'tight',   label: 'Tight' },
-          { value: 'wide',    label: 'Wide' },
-          { value: 'widest',  label: 'Widest' },
-        ]} />
-      </Row>
-      <Row label="Line Height">
-        <SelectInput value={config.lineHeight || '1.6'} onChange={v => update({ lineHeight: v })} options={[
-          { value: '1',    label: 'Single (1.0)' },
-          { value: '1.25', label: 'Compact (1.25)' },
-          { value: '1.6',  label: 'Normal (1.6)' },
-          { value: '2',    label: 'Relaxed (2.0)' },
-          { value: '2.5',  label: 'Double (2.5)' },
-        ]} />
-      </Row>
+      <RichTextEditor field="text" prefix="" config={config} update={update} label="Text Content" />
       <Row label="Background Color">
         <ColorInput value={config.bgColor || '#1a2235'} onChange={v => update({ bgColor: v })} />
+      </Row>
+
+      <Row label="Padding (px)">
+        <NumberInput value={config.paddingPx} onChange={v => update({ paddingPx: v })} placeholder="Auto" />
       </Row>
     </>
   )

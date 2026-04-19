@@ -85,6 +85,9 @@ export default function DonutChart({ config = {}, isPreview = false }) {
     color           = '#14b8a6',
     showCenterLabel = true,
     showPercentage  = false,
+    // Title rich text config
+    titleFontFamily, titleFontSizePx, titleFontWeight, titleColor,
+    titleAlign, titleItalic, titleUnderline,
   } = config
 
   // Resolve all three numeric values from either live tags or static config
@@ -145,20 +148,25 @@ export default function DonutChart({ config = {}, isPreview = false }) {
       flexDirection: 'column',
       justifyContent: 'center',
       alignItems: 'center',
-      padding: 'clamp(6px, 3cqw, 20px)',
-      gap: 'clamp(2px, 1cqh, 8px)',
+      padding: config.paddingPx != null && config.paddingPx !== '' ? `${config.paddingPx}px` : 'max(2px, 1cqw)',
+      gap: 'max(1px, 0.8cqh)',
       boxSizing: 'border-box',
       overflow: 'hidden',
     }}>
       {/* Title — scales with container */}
       {showTitle && (
         <div style={{
-          fontSize: 'clamp(8px, 4.5cqw, 18px)',
-          fontWeight: 700,
+          width: '100%',
+          fontSize: titleFontSizePx ? `${titleFontSizePx}px` : 'max(10px, min(9cqw, 11cqh))',
+          fontFamily: titleFontFamily ? `'${titleFontFamily}', sans-serif` : undefined,
+          fontWeight: titleFontWeight === 'normal' ? 400 : (titleFontWeight === 'bold' ? 700 : 700),
           textTransform: 'uppercase',
-          letterSpacing: '0.1em',
-          color: 'var(--text-muted)',
-          textAlign: 'center',
+          letterSpacing: '0.08em',
+          color: titleColor || 'var(--text-muted)',
+          textAlign: titleAlign || 'center',
+          fontStyle: titleItalic ? 'italic' : undefined,
+          textDecoration: titleUnderline ? 'underline' : undefined,
+          marginBottom: 'max(1px, 0.4cqh)',
           flexShrink: 0,
         }}>
           {title}

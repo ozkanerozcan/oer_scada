@@ -110,6 +110,9 @@ export default function LineChartWidget({ config = {}, isPreview = false }) {
     yMinValue  = null,
     yMaxTagKey = '',
     yMaxValue  = null,
+    // Title rich text config
+    titleFontFamily, titleFontSizePx, titleFontWeight, titleColor,
+    titleAlign, titleItalic, titleUnderline,
   } = config
 
   const safePoints     = Math.min(Math.max(pointCount, 5), 120)
@@ -196,12 +199,35 @@ export default function LineChartWidget({ config = {}, isPreview = false }) {
   const noData = tagKey && liveData.length === 0
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: '14px 16px', gap: 8 }}>
+    <div style={{
+      width: '100%',
+      height: '100%',
+      containerType: 'size',
+      containerName: 'linechart',
+      display: 'flex',
+      flexDirection: 'column',
+      padding: config.paddingPx != null && config.paddingPx !== '' ? `${config.paddingPx}px` : 'max(2px, 1cqw)',
+      gap: 'max(1px, 0.8cqh)',
+      boxSizing: 'border-box'
+    }}>
       {showTitle && (
         <div style={{
-          fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-          letterSpacing: '0.1em', color: 'var(--text-muted)',
-          flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
+          width: '100%',
+          fontSize: titleFontSizePx ? `${titleFontSizePx}px` : 'max(10px, min(9cqw, 11cqh))',
+          fontFamily: titleFontFamily ? `'${titleFontFamily}', sans-serif` : undefined,
+          fontWeight: titleFontWeight === 'normal' ? 400 : (titleFontWeight === 'bold' ? 700 : 700),
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          color: titleColor || 'var(--text-muted)',
+          textAlign: titleAlign || 'center',
+          fontStyle: titleItalic ? 'italic' : undefined,
+          textDecoration: titleUnderline ? 'underline' : undefined,
+          marginBottom: 'max(1px, 0.4cqh)',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: titleAlign === 'left' ? 'flex-start' : titleAlign === 'right' ? 'flex-end' : 'center',
+          gap: 6,
         }}>
           {title}
           {tagKey && (
